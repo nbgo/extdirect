@@ -1,7 +1,11 @@
 package extdirect
 import (
-	"github.com/Sirupsen/logrus"
-	"github.com/nbgo/logger"
+	stdlog "log"
+	"os"
 )
 
-var log *logrus.Entry = logger.Create("extdirect")
+var log *stdlog.Logger = stdlog.New(os.Stderr, "extdirect ", stdlog.LstdFlags)
+
+func SetLogger(logger *stdlog.Logger) {
+	log = logger
+}

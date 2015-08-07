@@ -7,11 +7,10 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"reflect"
-	"runtime/debug"
 	"github.com/mitchellh/mapstructure"
-	"github.com/Sirupsen/logrus"
-	"errors"
 	"github.com/zenazn/goji/web"
+	"errors"
+	"runtime/debug"
 )
 
 type ErrInvalidContentType string
@@ -103,11 +102,14 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}
 			defer func() {
 				if err := recover(); err != nil {
-					log.WithFields(logrus.Fields{
-						"stack": string(debug.Stack()),
-						"action": req.Action,
-						"method": req.Method,
-					}).Error(errors.New(fmt.Sprintf("panic serving %v.%v: %v", req.Action, req.Method, err)))
+					if this.debug {
+						log.Println(errors.New(fmt.Sprintf("panic serving %v.%v: %v\nstack: %s", req.Action, req.Method, err, debug.Stack())))
+					}
+//					log.WithFields(logrus.Fields{
+//						"stack": string(debug.Stack()),
+//						"action": req.Action,
+//						"method": req.Method,
+//					}).Error(errors.New(fmt.Sprintf("panic serving %v.%v: %v", req.Action, req.Method, err)))
 					resp.Type = "exception"
 					resp.Message = fmt.Sprintf("%v", err)
 				}
@@ -116,7 +118,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 
 			// Create instance of action type
 			if this.debug {
-				log.Debugf("Create instance of action %s", req.Action)
+				log.Printf("Create instance of action %s", req.Action)
 			}
 			actionInfo := this.actionsInfo[req.Action]
 			actionVal := reflect.New(actionInfo.Type).Elem()
@@ -124,7 +126,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			// Set context and request
 			if c != nil || r != nil {
 				if this.debug {
-					log.Debugf("Set action context/request.")
+					log.Printf("Set action context/request.")
 				}
 				contextType := reflect.TypeOf(&web.C{})
 				requestType := reflect.TypeOf(&http.Request{})
@@ -134,14 +136,14 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 					case contextType:
 						if c != nil {
 							if this.debug {
-								log.Debugf("Set action context.")
+								log.Printf("Set action context.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						}
 					case requestType:
 						if r != nil {
 							if this.debug {
-								log.Debugf("Set action request.")
+								log.Printf("Set action request.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(r))
 						}
@@ -151,7 +153,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 
 			// Call action method
 			if this.debug {
-				log.Debugf("Prepare arguments for method %s.%s", req.Action, req.Method)
+				log.Printf("Prepare arguments for method %s.%s", req.Action, req.Method)
 			}
 			methodInfo := actionInfo.Methods[req.Method]
 			methodArgsLen := methodInfo.Type.NumIn() - 1
@@ -160,17 +162,17 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 				args = make([]reflect.Value, methodArgsLen)
 				for i, arg := range req.Data.([]interface{}) {
 					if this.debug {
-						log.Debugf("Initial arg #%v type is %T", i, arg)
+						log.Printf("Initial arg #%v type is %T", i, arg)
 					}
 					convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
 					if this.debug {
-						log.Debugf("Converted arg #%v type is %T", i, convertedArg)
+						log.Printf("Converted arg #%v type is %T", i, convertedArg)
 					}
 					args[i] = reflect.ValueOf(convertedArg)
 				}
 			}
 			if this.debug {
-				log.Debugf("Call method %s.%s", req.Action, req.Method)
+				log.Printf("Call method %s.%s", req.Action, req.Method)
 			}
 			resultsValues := actionVal.MethodByName(methodInfo.Name).Call(args)
 			for i, resultValue := range resultsValues {

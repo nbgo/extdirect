@@ -10,10 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"github.com/phayes/errors"
-	"github.com/Sirupsen/logrus"
 	"github.com/zenazn/goji/web"
+	"errors"
 )
+
+var providerDebug = false
 
 type GetDataRequest struct {
 	Page   int
@@ -40,30 +41,24 @@ type Db struct {
 }
 func (this Db) GetRecords(r *GetDataRequest) (string, error) {
 	result := fmt.Sprintf("model=%v page=%v start=%v limit=%v sort=%v", r.Model, r.Page, r.Start, r.Limit, r.Sort)
-	fmt.Println(result)
 	return result, nil
 }
 func (this Db) Test() string {
-	fmt.Println("Hello from Test()")
 	time.Sleep(30 * time.Millisecond)
 	var result string
 	if this.C != nil {
-		fmt.Println("Context is set.")
 		result += this.C.URLParams["test"]
 	}
 	if this.R != nil {
-		fmt.Println("Request is set.")
 		result += this.R.Host
 	}
 	return result
 }
 func (this Db) TestEcho1(s string) (string, error) {
-	fmt.Println("Hello from TestEcho1()")
 	time.Sleep(30 * time.Millisecond)
 	return s, nil
 }
 func (this Db) TestEcho2(s string, n int, n2 int8, n3 int16, n4 int32, n5 int, s2 string) string {
-	fmt.Println("Hello from TestEcho2()")
 	time.Sleep(30 * time.Millisecond)
 	return fmt.Sprintf("%v%v%v%v%v%v%v", s, n, n2, n3, n4, n5, s2)
 }
@@ -81,8 +76,6 @@ func (this Db) TestException4() {
 }
 
 func TestExtDirect(t *testing.T) {
-	logrus.SetLevel(logrus.DebugLevel)
-
 	Convey("Default provider serialization", t, func() {
 		value, err := Provider.Json()
 		So(err, ShouldBeNil)
@@ -91,7 +84,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Action registration", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		Convey("One registered action with name 'Db' expected", func() {
 			So(len(provider.Actions), ShouldEqual, 1)
@@ -172,7 +165,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Request with single action call", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":1}`))
 		Convey("has one parsed request with correct fields", func() {
@@ -203,7 +196,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Request with multiple actions call", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`[{"action":"Db","method":"testEcho1","data":["Hello!"],"type":"rpc","tid":1},{"action":"Db","method":"testEcho2","data":["Hello", 1, 2, 3, 4, null, null],"type":"rpc","tid":2}]`))
 		Convey("has 2 parsed requests with correct fields", func() {
@@ -255,7 +248,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Exception methods call", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`[{"action":"Db","method":"testException1","data":null,"type":"rpc","tid":1},{"action":"Db","method":"testException2","data":null,"type":"rpc","tid":2},{"action":"Db","method":"testException3","data":null,"type":"rpc","tid":3},{"action":"Db","method":"testException4","data":null,"type":"rpc","tid":4}]`))
 		Convey("processed with 4 responses", func() {
@@ -281,7 +274,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Get records", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"getRecords","data":[{"page":1,"start":0,"limit":25,"sort":[{"property":"text","direction":"ASC"}]}],"type":"rpc","tid":1}`))
 		Convey("processed with correct result", func() {
@@ -295,7 +288,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Context setting", t, func() {
 		provider := NewProvider()
-		provider.Debug(true)
+		provider.Debug(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":1}`))
 		resps := provider.processRequests(&web.C{URLParams:map[string]string{"test":"test1"}}, &http.Request{Host: "test2"}, reqs)
