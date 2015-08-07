@@ -9,7 +9,7 @@ import (
 	"github.com/zenazn/goji/web"
 	"fmt"
 	"time"
-	"github.com/phayes/errors"
+	"errors"
 )
 
 type GetDataRequest struct {
