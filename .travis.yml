@@ -9,3 +9,6 @@ branches:
 
 install:
   - go get github.com/smartystreets/goconvey/convey
+  - go get github.com/mitchellh/mapstructure
+  - go get github.com/zenazn/goji/web
+  - go get github.com/ahmetalpbalkan/go-linq
