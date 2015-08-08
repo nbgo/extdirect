@@ -4,6 +4,7 @@ import (
 	"testing"
 	. "github.com/smartystreets/goconvey/convey"
 	. "github.com/ahmetalpbalkan/go-linq"
+	lgr "github.com/nbgo/logger"
 	"reflect"
 	"net/http"
 	"strings"
@@ -12,9 +13,20 @@ import (
 	"time"
 	"github.com/zenazn/goji/web"
 	"errors"
+	"github.com/Sirupsen/logrus"
 )
 
 var providerDebug = false
+var l = lgr.Create()
+
+type testLogger struct {}
+func (this *testLogger) Print(v ...interface{}) {
+	if err, errOk := v[0].(error); errOk {
+		l.Error(err)
+	} else {
+		l.Debug(v[0])
+	}
+}
 
 type GetDataRequest struct {
 	Page   int
@@ -76,6 +88,9 @@ func (this Db) TestException4() {
 }
 
 func TestExtDirect(t *testing.T) {
+	SetLogger(&testLogger{})
+	logrus.SetLevel(logrus.FatalLevel)
+
 	Convey("Default provider serialization", t, func() {
 		value, err := Provider.Json()
 		So(err, ShouldBeNil)
@@ -84,7 +99,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Action registration", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		Convey("One registered action with name 'Db' expected", func() {
 			So(len(provider.Actions), ShouldEqual, 1)
@@ -165,7 +180,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Request with single action call", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":1}`))
 		Convey("has one parsed request with correct fields", func() {
@@ -196,7 +211,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Request with multiple actions call", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`[{"action":"Db","method":"testEcho1","data":["Hello!"],"type":"rpc","tid":1},{"action":"Db","method":"testEcho2","data":["Hello", 1, 2, 3, 4, null, null],"type":"rpc","tid":2}]`))
 		Convey("has 2 parsed requests with correct fields", func() {
@@ -248,7 +263,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Exception methods call", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`[{"action":"Db","method":"testException1","data":null,"type":"rpc","tid":1},{"action":"Db","method":"testException2","data":null,"type":"rpc","tid":2},{"action":"Db","method":"testException3","data":null,"type":"rpc","tid":3},{"action":"Db","method":"testException4","data":null,"type":"rpc","tid":4}]`))
 		Convey("processed with 4 responses", func() {
@@ -274,7 +289,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Get records", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"getRecords","data":[{"page":1,"start":0,"limit":25,"sort":[{"property":"text","direction":"ASC"}]}],"type":"rpc","tid":1}`))
 		Convey("processed with correct result", func() {
@@ -288,7 +303,7 @@ func TestExtDirect(t *testing.T) {
 
 	Convey("Context setting", t, func() {
 		provider := NewProvider()
-		provider.Debug(providerDebug)
+		provider.LogMode(providerDebug)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":1}`))
 		resps := provider.processRequests(&web.C{URLParams:map[string]string{"test":"test1"}}, &http.Request{Host: "test2"}, reqs)

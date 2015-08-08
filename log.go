@@ -4,8 +4,12 @@ import (
 	"os"
 )
 
-var log *stdlog.Logger = stdlog.New(os.Stderr, "extdirect ", stdlog.LstdFlags)
+type logger interface {
+	Print(v ...interface{})
+}
 
-func SetLogger(logger *stdlog.Logger) {
-	log = logger
+var log logger = stdlog.New(os.Stderr, "", stdlog.LstdFlags)
+
+func SetLogger(l logger) {
+	log = l
 }

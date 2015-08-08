@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"github.com/mitchellh/mapstructure"
 	"github.com/zenazn/goji/web"
-	"errors"
-	"runtime/debug"
 )
 
 type ErrInvalidContentType string
@@ -18,12 +16,21 @@ func (this ErrInvalidContentType) Error() string {
 	return fmt.Sprintf("invalid content type: %s", string(this))
 }
 
-type errTypeConversion struct {
+type ErrTypeConversion struct {
 	SourceType reflect.Type
 	TargetType reflect.Type
 }
-func (this *errTypeConversion) Error() string {
+func (this *ErrTypeConversion) Error() string {
 	return fmt.Sprintf("cannot convert type %v to type %v", this.SourceType, this.TargetType)
+}
+
+type ErrDirectActionMethod struct {
+	Action string
+	Method string
+	Err    interface{}
+}
+func (this *ErrDirectActionMethod) Error() string {
+	return fmt.Sprintf("error serving %v.%v: %v", this.Action, this.Method, this.Err)
 }
 
 type request struct {
@@ -102,14 +109,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}
 			defer func() {
 				if err := recover(); err != nil {
-					if this.debug {
-						log.Println(errors.New(fmt.Sprintf("panic serving %v.%v: %v\nstack: %s", req.Action, req.Method, err, debug.Stack())))
-					}
-//					log.WithFields(logrus.Fields{
-//						"stack": string(debug.Stack()),
-//						"action": req.Action,
-//						"method": req.Method,
-//					}).Error(errors.New(fmt.Sprintf("panic serving %v.%v: %v", req.Action, req.Method, err)))
+					log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
 					resp.Type = "exception"
 					resp.Message = fmt.Sprintf("%v", err)
 				}
@@ -117,16 +117,16 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}()
 
 			// Create instance of action type
-			if this.debug {
-				log.Printf("Create instance of action %s", req.Action)
+			if this.writeLog {
+				log.Print(fmt.Sprintf("Create instance of action %s", req.Action))
 			}
 			actionInfo := this.actionsInfo[req.Action]
 			actionVal := reflect.New(actionInfo.Type).Elem()
 
 			// Set context and request
 			if c != nil || r != nil {
-				if this.debug {
-					log.Printf("Set action context/request.")
+				if this.writeLog {
+					log.Print("Set action context/request.")
 				}
 				contextType := reflect.TypeOf(&web.C{})
 				requestType := reflect.TypeOf(&http.Request{})
@@ -135,15 +135,15 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 					switch actionInfo.Type.Field(i).Type {
 					case contextType:
 						if c != nil {
-							if this.debug {
-								log.Printf("Set action context.")
+							if this.writeLog {
+								log.Print("Set action context.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						}
 					case requestType:
 						if r != nil {
-							if this.debug {
-								log.Printf("Set action request.")
+							if this.writeLog {
+								log.Print("Set action request.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(r))
 						}
@@ -152,8 +152,8 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}
 
 			// Call action method
-			if this.debug {
-				log.Printf("Prepare arguments for method %s.%s", req.Action, req.Method)
+			if this.writeLog {
+				log.Print(fmt.Sprintf("Prepare arguments for method %s.%s", req.Action, req.Method))
 			}
 			methodInfo := actionInfo.Methods[req.Method]
 			methodArgsLen := methodInfo.Type.NumIn() - 1
@@ -161,23 +161,24 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			if req.Data != nil {
 				args = make([]reflect.Value, methodArgsLen)
 				for i, arg := range req.Data.([]interface{}) {
-					if this.debug {
-						log.Printf("Initial arg #%v type is %T", i, arg)
+					if this.writeLog {
+						log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
 					}
 					convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
-					if this.debug {
-						log.Printf("Converted arg #%v type is %T", i, convertedArg)
+					if this.writeLog {
+						log.Print(fmt.Sprintf("Converted arg #%v type is %T", i, convertedArg))
 					}
 					args[i] = reflect.ValueOf(convertedArg)
 				}
 			}
-			if this.debug {
-				log.Printf("Call method %s.%s", req.Action, req.Method)
+			if this.writeLog {
+				log.Print(fmt.Sprintf("Call method %s.%s", req.Action, req.Method))
 			}
 			resultsValues := actionVal.MethodByName(methodInfo.Name).Call(args)
 			for i, resultValue := range resultsValues {
 				if methodInfo.Type.Out(i).Name() == "error" {
 					if err, isErr := resultValue.Interface().(error); isErr {
+						log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
 						resp.Type = "exception"
 						resp.Message = fmt.Sprintf("%v", err)
 						resp.Result = nil
@@ -228,7 +229,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(v)
 			case reflect.Int32: return int32(v)
 			case reflect.Float32: return float32(v)
-			default: panic(&errTypeConversion{sourceType, argType})
+			default: panic(&ErrTypeConversion{sourceType, argType})
 			}
 		case nil:
 			switch argType.Kind() {
@@ -237,7 +238,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(0)
 			case reflect.Int32: return int32(0)
 			case reflect.String: return ""
-			default: panic(&errTypeConversion{sourceType, argType})
+			default: panic(&ErrTypeConversion{sourceType, argType})
 			}
 		case map[string]interface{}:
 			switch argType.Kind() {
@@ -247,7 +248,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 				structInstanceRef := structInstanceValue.Addr().Interface()
 				mapstructure.Decode(v, structInstanceRef)
 				return structInstanceValue.Interface()
-			default: panic(&errTypeConversion{sourceType, argType})
+			default: panic(&ErrTypeConversion{sourceType, argType})
 			}
 		}
 	}
