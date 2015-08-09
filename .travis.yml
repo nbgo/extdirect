@@ -14,3 +14,4 @@ install:
   - go get github.com/ahmetalpbalkan/go-linq
   - go get github.com/hypebeast/gojistatic
   - go get github.com/Sirupsen/logrus
+  - go get github.com/nbgo/logger
