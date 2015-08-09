@@ -14,7 +14,8 @@ type DirectServiceProvider struct {
 	Timeout     int `json:"timeout"`
 	Actions     map[string]DirectAction `json:"actions"`
 	actionsInfo map[string]directActionInfo
-	writeLog bool
+	debug       bool
+	profile     bool
 }
 
 type DirectAction []interface{}
@@ -37,10 +38,13 @@ func (this *DirectServiceProvider) Json() (string, error) {
 	}
 }
 
-func (this *DirectServiceProvider) LogMode(writeLog bool) {
-	this.writeLog = writeLog
+func (this *DirectServiceProvider) Debug(debug bool) {
+	this.debug = debug
 }
 
+func (this *DirectServiceProvider) Profile(profile bool) {
+	this.profile = profile
+}
 
 func (this *DirectServiceProvider) JavaScript() (string, error) {
 	if apiJson, err := this.Json(); err != nil {

@@ -2,6 +2,8 @@ package extdirect
 import (
 	stdlog "log"
 	"os"
+	"github.com/Sirupsen/logrus"
+	"strings"
 )
 
 type logger interface {
@@ -12,4 +14,38 @@ var log logger = stdlog.New(os.Stderr, "", stdlog.LstdFlags)
 
 func SetLogger(l logger) {
 	log = l
+}
+
+type LogrusLogger struct {
+	L *logrus.Entry
+}
+func (this *LogrusLogger) Print(v ...interface{}) {
+	if len(v) == 0 {
+		return
+	}
+	l := this.L
+	if len(v) == 1 {
+		if err, errOk := v[0].(error); errOk {
+
+			if err2, err2Ok := err.(*ErrDirectActionMethod); err2Ok {
+				l = l.WithFields(logrus.Fields{
+					"action": err2.Action,
+					"method": err2.Method,
+				})
+			}
+			l.Error(err)
+		} else {
+			l.Debug(v[0])
+		}
+	} else {
+		if len(v) > 2 {
+			l = l.WithFields(v[2].(map[string]interface{}))
+		}
+
+		m := strings.TrimSpace(v[1].(string))
+		switch strings.TrimSpace(v[0].(string)) {
+		case "info:": l.Info(m)
+		case "warn:": l.Warn(m)
+		}
+	}
 }

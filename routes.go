@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"github.com/mitchellh/mapstructure"
 	"github.com/zenazn/goji/web"
+	"time"
 )
 
 type ErrInvalidContentType string
@@ -30,7 +31,7 @@ type ErrDirectActionMethod struct {
 	Err    interface{}
 }
 func (this *ErrDirectActionMethod) Error() string {
-	return fmt.Sprintf("error serving %v.%v: %v", this.Action, this.Method, this.Err)
+	return fmt.Sprintf("error serving %v.%v(): %v", this.Action, this.Method, this.Err)
 }
 
 type request struct {
@@ -107,7 +108,14 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 				Method: req.Method,
 				Type: req.Type,
 			}
+			var tStart time.Time
+			profilingStarted := false
 			defer func() {
+				if profilingStarted {
+					duration := time.Now().Sub(tStart)
+					log.Print("info: ", fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
+					profilingStarted = false
+				}
 				if err := recover(); err != nil {
 					log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
 					resp.Type = "exception"
@@ -117,7 +125,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}()
 
 			// Create instance of action type
-			if this.writeLog {
+			if this.debug {
 				log.Print(fmt.Sprintf("Create instance of action %s", req.Action))
 			}
 			actionInfo := this.actionsInfo[req.Action]
@@ -125,7 +133,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 
 			// Set context and request
 			if c != nil || r != nil {
-				if this.writeLog {
+				if this.debug {
 					log.Print("Set action context/request.")
 				}
 				contextType := reflect.TypeOf(&web.C{})
@@ -135,14 +143,14 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 					switch actionInfo.Type.Field(i).Type {
 					case contextType:
 						if c != nil {
-							if this.writeLog {
+							if this.debug {
 								log.Print("Set action context.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						}
 					case requestType:
 						if r != nil {
-							if this.writeLog {
+							if this.debug {
 								log.Print("Set action request.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(r))
@@ -152,7 +160,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			}
 
 			// Call action method
-			if this.writeLog {
+			if this.debug {
 				log.Print(fmt.Sprintf("Prepare arguments for method %s.%s", req.Action, req.Method))
 			}
 			methodInfo := actionInfo.Methods[req.Method]
@@ -161,20 +169,30 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 			if req.Data != nil {
 				args = make([]reflect.Value, methodArgsLen)
 				for i, arg := range req.Data.([]interface{}) {
-					if this.writeLog {
+					if this.debug {
 						log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
 					}
 					convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
-					if this.writeLog {
+					if this.debug {
 						log.Print(fmt.Sprintf("Converted arg #%v type is %T", i, convertedArg))
 					}
 					args[i] = reflect.ValueOf(convertedArg)
 				}
 			}
-			if this.writeLog {
+			if this.debug {
 				log.Print(fmt.Sprintf("Call method %s.%s", req.Action, req.Method))
 			}
+
+			if this.profile {
+				profilingStarted = true
+				tStart = time.Now()
+			}
 			resultsValues := actionVal.MethodByName(methodInfo.Name).Call(args)
+			if profilingStarted {
+				duration := time.Now().Sub(tStart)
+				log.Print("info: ", fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
+				profilingStarted = false
+			}
 			for i, resultValue := range resultsValues {
 				if methodInfo.Type.Out(i).Name() == "error" {
 					if err, isErr := resultValue.Interface().(error); isErr {
