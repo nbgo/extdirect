@@ -13,7 +13,7 @@ import (
 	"time"
 	"github.com/zenazn/goji/web"
 	"github.com/Sirupsen/logrus"
-	"github.com/phayes/errors"
+	"errors"
 )
 
 var providerDebug = true
