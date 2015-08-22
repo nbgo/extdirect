@@ -9,7 +9,7 @@ branches:
     - master
 
 before_install:
-  - go get code.google.com/p/go.tools/cmd/cover
+  - go get golang.org/x/tools/cmd/cover
   
 install:
   - go get github.com/smartystreets/goconvey/convey
