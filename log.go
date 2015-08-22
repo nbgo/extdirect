@@ -4,6 +4,7 @@ import (
 	"os"
 	"github.com/Sirupsen/logrus"
 	"strings"
+	"runtime/debug"
 )
 
 type logger interface {
@@ -26,11 +27,11 @@ func (this *LogrusLogger) Print(v ...interface{}) {
 	l := this.L
 	if len(v) == 1 {
 		if err, errOk := v[0].(error); errOk {
-
 			if err2, err2Ok := err.(*ErrDirectActionMethod); err2Ok {
 				l = l.WithFields(logrus.Fields{
 					"action": err2.Action,
 					"method": err2.Method,
+					"stack": string(debug.Stack()),
 				})
 			}
 			l.Error(err)
