@@ -16,6 +16,9 @@ import (
 	"errors"
 	"code.google.com/p/go.net/context"
 	gcontext "github.com/goji/context"
+	"net/http/httptest"
+	"io/ioutil"
+	. "github.com/jacobsa/oglematchers"
 )
 
 var providerDebug = true
@@ -53,8 +56,12 @@ func (this Db) Test() string {
 	var result string
 	if this.C != nil {
 		gc := gcontext.ToC(this.C)
-		result += gc.URLParams["test"]
-		result += this.C.Value("user").(string)
+		if v, ok := gc.URLParams["test"]; ok {
+			result += v
+		}
+		if v, ok := this.C.Value("user").(string); ok {
+			result += v
+		}
 	}
 	if this.R != nil {
 		result += this.R.Host
@@ -105,6 +112,7 @@ func TestExtDirect(t *testing.T) {
 		provider.Debug(providerDebug)
 		provider.Profile(providerProfile)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
+
 		Convey("One registered action with name 'Db' expected", func() {
 			So(len(provider.Actions), ShouldEqual, 1)
 			So(provider.Actions, ShouldContainKey, "Db")
@@ -172,6 +180,7 @@ func TestExtDirect(t *testing.T) {
 				})
 			})
 		})
+
 		Convey("Action with methods serialization", func() {
 			jsonText, err := provider.Json()
 			So(err, ShouldBeNil)
@@ -242,7 +251,7 @@ func TestExtDirect(t *testing.T) {
 				t1 := time.Now()
 				resps := provider.processRequests(nil, nil, reqs)
 				t2 := time.Now()
-				So(t2.Sub(t1), ShouldBeLessThan, 40 * time.Millisecond)
+				So(t2.Sub(t1), ShouldBeLessThan, 50 * time.Millisecond)
 				So(len(resps), ShouldEqual, 2)
 
 				testEcho1Resp := getResponseByTid(resps, 1);
@@ -328,5 +337,78 @@ func TestExtDirect(t *testing.T) {
 		So(resps[0].Message, ShouldBeEmpty)
 		So(resps[0].Type, ShouldEqual, "rpc")
 		So(resps[0].Result, ShouldEqual, "test1TestUsertest2")
+	})
+
+	Convey("HTTP handlers", t, func() {
+		provider := NewProvider()
+		provider.Debug(providerDebug)
+		provider.Profile(providerProfile)
+		provider.RegisterAction(reflect.TypeOf(Db{}))
+
+		mux := web.New()
+		mux.Use(gcontext.Middleware)
+		mux.Use(func(c *web.C, h http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				c.Env["user"] = "TestUser"
+				h.ServeHTTP(w, r)
+			})
+		})
+		mux.Get(provider.Url, Api(provider))
+		mux.Post(provider.Url, func(c web.C, w http.ResponseWriter, r *http.Request) {
+			ActionsHandlerCtx(provider)(gcontext.FromC(c), w, r)
+		})
+		mux.Post("/directapi2", ActionsHandler(provider))
+		srv := httptest.NewServer(mux)
+		defer srv.Close()
+
+		Convey("API info request", func() {
+			res, err := http.Get(srv.URL + provider.Url)
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "text/javascript; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						So(err, ShouldBeNil)
+						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0}]}}`)
+					})
+				})
+			})
+		})
+
+		Convey("API handler request with context", func() {
+			res, err := http.Post(srv.URL + provider.Url, "application/json", strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":33}`))
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "application/json; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						So(err, ShouldBeNil)
+						fmt.Println(string(body))
+						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","message":"","result":"TestUser127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
+					})
+				})
+			})
+		})
+
+		Convey("API handler request without context", func() {
+			res, err := http.Post(srv.URL + "/directapi2", "application/json", strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":33}`))
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "application/json; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						So(err, ShouldBeNil)
+						fmt.Println(string(body))
+						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","message":"","result":"127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
+					})
+				})
+			})
+		})
 	})
 }

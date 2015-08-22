@@ -19,6 +19,8 @@ install:
   - go get github.com/hypebeast/gojistatic
   - go get github.com/Sirupsen/logrus
   - go get github.com/nbgo/logger
+  - go get github.com/goji/context
+  - go get github.com/jacobsa/oglematchers
 
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic
