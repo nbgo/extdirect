@@ -1,3 +1,4 @@
+sudo: false
 language: go
 
 go:
@@ -17,7 +18,5 @@ install:
   - go get github.com/Sirupsen/logrus
   - go get github.com/nbgo/logger
 
-before_install:
-  - sudo pip install virtualenv
 after_success:
-  - codecov
+  - bash <(curl -s https://codecov.io/bash)
