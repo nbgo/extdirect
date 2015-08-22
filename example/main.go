@@ -10,15 +10,16 @@ import (
 	"fmt"
 	"time"
 	"errors"
+	"github.com/goji/context"
 )
 
 type GetDataRequest struct {
-	Page int
-	Start int
-	Limit int
-	Sort []SortDescriptor
+	Page   int
+	Start  int
+	Limit  int
+	Sort   []SortDescriptor
 	Filter []FilterDescriptor
-	Model string
+	Model  string
 }
 
 type SortDescriptor struct {
@@ -32,12 +33,12 @@ type FilterDescriptor struct {
 }
 
 type GetDataResponse struct {
-	Total int `json:"total"`
+	Total   int `json:"total"`
 	Records []interface{} `json:"records"`
 }
 
 type User struct {
-	Id int `json:"id"`
+	Id   int `json:"id"`
 	Text string `json:"text"`
 }
 
@@ -49,7 +50,7 @@ func (this Db) GetRecords(r *GetDataRequest) (*GetDataResponse, error) {
 	fmt.Printf("Hello from GetRecords(): model=%v start=%v limit=%v\n", r.Model, r.Start, r.Limit)
 	result := &GetDataResponse{
 		Total: 2,
-		Records: []interface{} {
+		Records: []interface{}{
 			&User{1, "Bob"},
 			&User{2, "Alice"},
 		},
@@ -86,7 +87,9 @@ func (this Db) TestException4() {
 func main() {
 	extdirect.Provider.RegisterAction(reflect.TypeOf(Db{}))
 	goji.Get(extdirect.Provider.Url, extdirect.Api(extdirect.Provider))
-	goji.Post(extdirect.Provider.Url, extdirect.ActionsHandlerCtx(extdirect.Provider))
+	goji.Post(extdirect.Provider.Url, func(c web.C, w http.ResponseWriter, r *http.Request) {
+		extdirect.ActionsHandlerCtx(extdirect.Provider)(context.FromC(c), w, r)
+	})
 	goji.Use(gojistatic.Static("public", gojistatic.StaticOptions{SkipLogging:true}))
 	goji.Serve()
 }
