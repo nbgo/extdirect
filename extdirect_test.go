@@ -189,6 +189,11 @@ func TestExtDirect(t *testing.T) {
 			So(err2, ShouldBeNil)
 			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0}]}}`)
 		})
+
+		Convey("Duplicated registration", func() {
+			provider.RegisterAction(reflect.TypeOf(Db{}))
+			So(len(provider.Actions), ShouldEqual, 1)
+		})
 	})
 
 	Convey("Request with single action call", t, func() {
