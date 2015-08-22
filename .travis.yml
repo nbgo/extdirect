@@ -15,3 +15,8 @@ install:
   - go get github.com/hypebeast/gojistatic
   - go get github.com/Sirupsen/logrus
   - go get github.com/nbgo/logger
+
+before_install:
+  - pip install codecov
+after_success:
+  - codecov
