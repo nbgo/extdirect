@@ -17,6 +17,6 @@ install:
   - go get github.com/nbgo/logger
 
 before_install:
-  - pip install codecov
+  - sudo pip install virtualenv
 after_success:
   - codecov
