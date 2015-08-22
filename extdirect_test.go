@@ -78,6 +78,14 @@ func (this Db) TestException4() {
 	panic(errors.New("Error example #4"))
 }
 
+func getResponseByTid(responses []*response, tid int) *response {
+	resp, _, _ := From(responses).FirstBy(func(x T) (bool, error) {
+		return x.(*response).Tid == tid, nil
+	})
+
+	return resp.(*response)
+}
+
 func TestExtDirect(t *testing.T) {
 	SetLogger(&LogrusLogger{nblogger.Create()})
 	logrus.SetLevel(logrus.DebugLevel)
@@ -230,21 +238,24 @@ func TestExtDirect(t *testing.T) {
 				t1 := time.Now()
 				resps := provider.processRequests(nil, nil, reqs)
 				t2 := time.Now()
-				So(t2.Sub(t1), ShouldBeLessThan, 35 * time.Millisecond)
+				So(t2.Sub(t1), ShouldBeLessThan, 40 * time.Millisecond)
 				So(len(resps), ShouldEqual, 2)
-				So(resps[0].Message, ShouldBeEmpty)
-				So(resps[0].Type, ShouldEqual, "rpc")
-				So(resps[0].Action, ShouldEqual, "Db")
-				So(resps[0].Method, ShouldEqual, "testEcho1")
-				So(resps[0].Result, ShouldEqual, "Hello!")
-				So(resps[0].Tid, ShouldEqual, 1)
 
-				So(resps[1].Message, ShouldBeEmpty)
-				So(resps[1].Type, ShouldEqual, "rpc")
-				So(resps[1].Action, ShouldEqual, "Db")
-				So(resps[1].Method, ShouldEqual, "testEcho2")
-				So(resps[1].Result, ShouldEqual, "Hello12340")
-				So(resps[1].Tid, ShouldEqual, 2)
+				testEcho1Resp := getResponseByTid(resps, 1);
+				So(testEcho1Resp.Message, ShouldBeEmpty)
+				So(testEcho1Resp.Type, ShouldEqual, "rpc")
+				So(testEcho1Resp.Action, ShouldEqual, "Db")
+				So(testEcho1Resp.Method, ShouldEqual, "testEcho1")
+				So(testEcho1Resp.Result, ShouldEqual, "Hello!")
+				So(testEcho1Resp.Tid, ShouldEqual, 1)
+
+				testEcho2Resp := getResponseByTid(resps, 2);
+				So(testEcho2Resp.Message, ShouldBeEmpty)
+				So(testEcho2Resp.Type, ShouldEqual, "rpc")
+				So(testEcho2Resp.Action, ShouldEqual, "Db")
+				So(testEcho2Resp.Method, ShouldEqual, "testEcho2")
+				So(testEcho2Resp.Result, ShouldEqual, "Hello12340")
+				So(testEcho2Resp.Tid, ShouldEqual, 2)
 				Convey("which is serialized correctly", func() {
 					s, err := json.Marshal(resps)
 					So(err, ShouldBeNil)
