@@ -8,6 +8,9 @@ branches:
   only:
     - master
 
+before_install:
+  - go get code.google.com/p/go.tools/cmd/cover
+  
 install:
   - go get github.com/smartystreets/goconvey/convey
   - go get github.com/mitchellh/mapstructure
@@ -16,6 +19,9 @@ install:
   - go get github.com/hypebeast/gojistatic
   - go get github.com/Sirupsen/logrus
   - go get github.com/nbgo/logger
+
+script:
+  - go test -coverprofile=coverage.txt -covermode=atomic
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
