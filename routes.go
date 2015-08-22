@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"reflect"
 	"github.com/mitchellh/mapstructure"
-	"github.com/zenazn/goji/web"
 	"time"
+	"golang.org/x/net/context"
 )
 
 type ErrInvalidContentType string
@@ -71,13 +71,13 @@ func ActionsHandler(provider *DirectServiceProvider) func(w http.ResponseWriter,
 	}
 }
 
-func ActionsHandlerCtx(provider *DirectServiceProvider) func(c web.C, w http.ResponseWriter, r *http.Request) {
-	return func(c web.C, w http.ResponseWriter, r *http.Request) {
-		actionHandler(provider, &c, w, r)
+func ActionsHandlerCtx(provider *DirectServiceProvider) func(c context.Context, w http.ResponseWriter, r *http.Request) {
+	return func(c context.Context, w http.ResponseWriter, r *http.Request) {
+		actionHandler(provider, c, w, r)
 	}
 }
 
-func actionHandler(provider *DirectServiceProvider, c *web.C, w http.ResponseWriter, r *http.Request) {
+func actionHandler(provider *DirectServiceProvider, c context.Context, w http.ResponseWriter, r *http.Request) {
 	var reqs []*request
 	contentType := r.Header.Get("Content-Type")
 
@@ -97,7 +97,7 @@ func actionHandler(provider *DirectServiceProvider, c *web.C, w http.ResponseWri
 	}
 }
 
-func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, reqs []*request) []*response {
+func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Request, reqs []*request) []*response {
 	resps := make([]*response, len(reqs))
 	respsChannel := make(chan *response, len(reqs))
 	for _, req := range reqs {
@@ -136,19 +136,24 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 				if this.debug {
 					log.Print("Set action context/request.")
 				}
-				contextType := reflect.TypeOf(&web.C{})
+				contextType := reflect.TypeOf((*context.Context)(nil)).Elem()
 				requestType := reflect.TypeOf(&http.Request{})
 				fieldsLen := actionInfo.Type.NumField()
 				for i := 0; i < fieldsLen; i++ {
-					switch actionInfo.Type.Field(i).Type {
-					case contextType:
+					t := actionInfo.Type.Field(i).Type
+
+					if t.Implements(contextType) {
 						if c != nil {
 							if this.debug {
 								log.Print("Set action context.")
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(c))
+						} else {
+							log.Print("Context cannot be set to action instance because context is nil.")
 						}
-					case requestType:
+					}
+
+					if t == requestType {
 						if r != nil {
 							if this.debug {
 								log.Print("Set action request.")
@@ -210,7 +215,7 @@ func (this *DirectServiceProvider) processRequests(c *web.C, r *http.Request, re
 		}(req)
 	}
 
-	for i := 0; i< len(reqs); i++ {
+	for i := 0; i < len(reqs); i++ {
 		var resp = <-respsChannel
 		resps[i] = resp
 	}

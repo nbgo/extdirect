@@ -14,6 +14,8 @@ import (
 	"github.com/zenazn/goji/web"
 	"github.com/Sirupsen/logrus"
 	"errors"
+	"code.google.com/p/go.net/context"
+	gcontext "github.com/goji/context"
 )
 
 var providerDebug = true
@@ -39,7 +41,7 @@ type FilterDescriptor struct {
 }
 
 type Db struct {
-	C *web.C
+	C context.Context
 	R *http.Request
 }
 func (this Db) GetRecords(r *GetDataRequest) (string, error) {
@@ -50,7 +52,9 @@ func (this Db) Test() string {
 	time.Sleep(30 * time.Millisecond)
 	var result string
 	if this.C != nil {
-		result += this.C.URLParams["test"]
+		gc := gcontext.ToC(this.C)
+		result += gc.URLParams["test"]
+		result += this.C.Value("user").(string)
 	}
 	if this.R != nil {
 		result += this.R.Host
@@ -314,10 +318,15 @@ func TestExtDirect(t *testing.T) {
 		provider.Profile(providerProfile)
 		provider.RegisterAction(reflect.TypeOf(Db{}))
 		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":1}`))
-		resps := provider.processRequests(&web.C{URLParams:map[string]string{"test":"test1"}}, &http.Request{Host: "test2"}, reqs)
+		resps := provider.processRequests(gcontext.Set(&web.C{
+			URLParams:map[string]string{"test":"test1"},
+			Env: map[interface{}]interface{}{
+				"user": "TestUser",
+			},
+		}, context.Background()), &http.Request{Host: "test2"}, reqs)
 		So(len(resps), ShouldEqual, 1)
 		So(resps[0].Message, ShouldBeEmpty)
 		So(resps[0].Type, ShouldEqual, "rpc")
-		So(resps[0].Result, ShouldEqual, "test1test2")
+		So(resps[0].Result, ShouldEqual, "test1TestUsertest2")
 	})
 }
