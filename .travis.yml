@@ -7,6 +7,7 @@ go:
 branches:
   only:
     - master
+    - develop
 
 before_install:
   - go get golang.org/x/tools/cmd/cover
