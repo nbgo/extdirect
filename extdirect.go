@@ -7,6 +7,8 @@ import (
 	"fmt"
 )
 
+type DirectMethodTags struct {}
+
 type DirectServiceProvider struct {
 	Type        string `json:"type"`
 	Url         string `json:"url"`
@@ -18,11 +20,12 @@ type DirectServiceProvider struct {
 	profile     bool
 }
 
-type DirectAction []interface{}
+type DirectAction []DirectMethod
 
 type DirectMethod struct {
-	Name string `json:"name"`
-	Len  int `json:"len"`
+	Name        string `json:"name"`
+	Len         int `json:"len"`
+	FormHandler *bool `json:"formHander,omitempty"`
 }
 
 type directActionInfo struct {
@@ -56,23 +59,57 @@ func (this *DirectServiceProvider) JavaScript() (string, error) {
 
 func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	actionTypeName := typeInfo.Name()
+	debug := this.debug
 	if _, ok := this.Actions[actionTypeName]; ok {
 		return
 	}
 
+	if debug {
+		log.Print(fmt.Sprintf("Register action %v", actionTypeName))
+	}
+
 	methodsLen := typeInfo.NumMethod()
-	directAction := make([]interface{}, 0)
+	directAction := make([]DirectMethod, 0)
 	methods := make(map[string]reflect.Method, 0)
+
+	if debug {
+		log.Print(fmt.Sprintf("\twith %v methods", methodsLen))
+	}
 
 	for i := 0; i < methodsLen; i++ {
 		methodInfo := typeInfo.Method(i)
-		argsLen := methodInfo.Type.NumIn() - 1
 
-		var directMethod interface{}
+		if debug {
+			log.Print(fmt.Sprintf("\tregister method %v", methodInfo.Name))
+		}
+
+		argsLen := methodInfo.Type.NumIn() - 1
 		directMethodName := firstCharToLower(methodInfo.Name)
-		directMethod = DirectMethod{
+		directMethod := DirectMethod{
 			Name: directMethodName,
 			Len: argsLen,
+		}
+
+		if debug {
+			log.Print(fmt.Sprintf("\t\twith args len = %v", argsLen))
+			log.Print("\t\tget method tags")
+		}
+
+		// Get method tags.
+		if tagsField := getDirectMethodTags(typeInfo, methodInfo.Name, debug); tagsField != nil {
+			if debug {
+				log.Print("\t\t\ttags found")
+			}
+
+			if tagsField.Tag.Get("formhandler") == "true" {
+				directMethod.FormHandler = new(bool)
+				*directMethod.FormHandler = true
+				directMethod.Len = 0
+			}
+		} else {
+			if debug {
+				log.Print("\t\t\tno tags found")
+			}
 		}
 
 		directAction = append(directAction, directMethod)
@@ -115,4 +152,32 @@ func firstCharToLower(s string) string {
 	rest := bts[1:]
 
 	return string(bytes.Join([][]byte{lc, rest}, nil))
+}
+
+func getDirectMethodTags(t reflect.Type, methodName string, debug bool) *reflect.StructField {
+	fieldsLen := t.NumField()
+	dmt := reflect.TypeOf(DirectMethodTags{})
+
+	if debug {
+		log.Print(fmt.Sprintf("\t\t\tsearch tag among %v fields", fieldsLen))
+	}
+
+	for i := 0; i < fieldsLen; i++ {
+		f := t.Field(i)
+		if debug {
+			log.Print(fmt.Sprintf("\t\t\t\tfield %v of type %v", f.Name, f.Type))
+		}
+		if f.Name == (methodName + "Tags") && f.Type == dmt {
+			if debug {
+				log.Print("\t\t\t\t\tis a tag")
+			}
+
+			return &f;
+		}
+		if debug {
+			log.Print(fmt.Sprintf("\t\t\t\t\tis NOT a tag: nameOk=%v, typeOk=%v", f.Name == (methodName + "Tags"), f.Type == dmt))
+		}
+	}
+
+	return nil
 }

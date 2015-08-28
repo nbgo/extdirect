@@ -44,8 +44,9 @@ type FilterDescriptor struct {
 }
 
 type Db struct {
-	C context.Context
-	R *http.Request
+	C                   context.Context
+	R                   *http.Request
+	UpdateBasicInfoTags DirectMethodTags `formhandler:"true"`
 }
 func (this Db) GetRecords(r *GetDataRequest) (string, error) {
 	result := fmt.Sprintf("model=%v page=%v start=%v limit=%v sort=%v", r.Model, r.Page, r.Start, r.Limit, r.Sort)
@@ -88,6 +89,10 @@ func (this Db) TestException3() (string, error) {
 func (this Db) TestException4() {
 	panic(errors.New("Error example #4"))
 }
+func (this Db) UpdateBasicInfo() {
+}
+
+
 
 func getResponseByTid(responses []*response, tid int) *response {
 	resp, _, _ := From(responses).FirstBy(func(x T) (bool, error) {
@@ -116,8 +121,8 @@ func TestExtDirect(t *testing.T) {
 		Convey("One registered action with name 'Db' expected", func() {
 			So(len(provider.Actions), ShouldEqual, 1)
 			So(provider.Actions, ShouldContainKey, "Db")
-			Convey("and has 8 methods", func() {
-				So(len(provider.Actions["Db"]), ShouldEqual, 8)
+			Convey("and has 9 methods", func() {
+				So(len(provider.Actions["Db"]), ShouldEqual, 9)
 				Convey("test", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
 						if m, ok := x.(DirectMethod); ok {
@@ -178,16 +183,35 @@ func TestExtDirect(t *testing.T) {
 						So(method.(DirectMethod).Len, ShouldEqual, 7)
 					});
 				})
+				Convey("updateBasicInfo", func() {
+					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
+						if m, ok := x.(DirectMethod); ok {
+							return m.Name == "updateBasicInfo", nil
+						} else {
+							return false, nil
+						}
+					})
+					So(err, ShouldBeNil)
+					So(exists, ShouldBeTrue)
+					So(method.(DirectMethod).Name, ShouldEqual, "updateBasicInfo")
+					Convey("marked as form handler", func() {
+						So(method.(DirectMethod).FormHandler, ShouldNotBeNil)
+						So(*method.(DirectMethod).FormHandler, ShouldBeTrue)
+					});
+					Convey("has 0 arguments", func() {
+						So(method.(DirectMethod).Len, ShouldEqual, 0)
+					});
+				})
 			})
 		})
 
 		Convey("Action with methods serialization", func() {
 			jsonText, err := provider.Json()
 			So(err, ShouldBeNil)
-			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0}]}}`)
+			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
 			javaScript, err2 := provider.JavaScript()
 			So(err2, ShouldBeNil)
-			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0}]}}`)
+			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
 		})
 
 		Convey("Duplicated registration", func() {
@@ -376,7 +400,7 @@ func TestExtDirect(t *testing.T) {
 						body, err := ioutil.ReadAll(res.Body)
 						res.Body.Close()
 						So(err, ShouldBeNil)
-						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0}]}}`)
+						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
 					})
 				})
 			})

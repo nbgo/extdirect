@@ -10,6 +10,9 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"time"
 	"golang.org/x/net/context"
+	"net/url"
+	"strconv"
+	"github.com/phayes/errors"
 )
 
 type ErrInvalidContentType string
@@ -85,8 +88,8 @@ func actionHandler(provider *DirectServiceProvider, c context.Context, w http.Re
 	case strings.HasPrefix(contentType, "application/json"):
 		reqs = mustDecodeTransaction(r.Body)
 	case strings.HasPrefix(contentType, "application/x-www-form-urlencoded"):
-	// httpReq.ParseForm()
-	// reqs = this.decodeFormPost(httpReq.Form)
+		r.ParseForm()
+		reqs = mustDecodeFormPost(r.Form)
 	default:
 		panic(ErrInvalidContentType(contentType))
 	}
@@ -149,7 +152,9 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 							}
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						} else {
-							log.Print("Context cannot be set to action instance because context is nil.")
+							if this.debug {
+								log.Print("warn:", "Context cannot be set to action instance because context is nil.")
+							}
 						}
 					}
 
@@ -223,12 +228,39 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 	return resps
 }
 
+func mustDecodeFormPost(f url.Values) []*request {
+	req := &request{
+		Type:f["extType"][0],
+		Action: f["extAction"][0],
+		Method: f["extMethod"][0],
+	}
+	tid, tidErr := strconv.Atoi(f["extMethod"][0]);
+	if tidErr != nil {
+		panic(errors.Wraps(tidErr, "failed to decode form post: could not parse TID"))
+	}
+	req.Tid = tid
+	upload, hasUpload := f["extUpload"]
+	req.Upload = hasUpload && strings.ToLower(upload[0]) == "true"
+
+	data := make(map[string]interface{}, 0)
+	for k, v := range f {
+		if k == "extType" || k == "extTID" || k == "extAction" || k == "extMethod" || k == "extUpload" {
+			continue
+		}
+		data[k] = v[0]
+	}
+	req.Data = data
+
+	return []*request{req}
+}
+
 func mustDecodeTransaction(r io.Reader) []*request {
 	if jsonData, err := ioutil.ReadAll(r); err != nil {
 		panic(err)
 	} else {
 		var reqs []*request
 		if err := json.Unmarshal(jsonData, &reqs); err != nil {
+			// Attempt to unmarshal as a single request.
 			var req request
 			if err := json.Unmarshal(jsonData, &req); err != nil {
 				panic(err)
