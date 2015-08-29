@@ -22,7 +22,7 @@ import (
 )
 
 var providerDebug = true
-var providerProfile = false
+var providerProfile = true
 
 type GetDataRequest struct {
 	Page   int
