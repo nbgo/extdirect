@@ -31,7 +31,8 @@ type DirectAction []DirectMethod
 
 type DirectMethod struct {
 	Name        string `json:"name"`
-	Len         int `json:"len"`
+	// Method declaration MUST have one of the following mutually exclusive properties that describe the Method’s calling convention:
+	Len         *int `json:"len,omitempty"`
 	FormHandler *bool `json:"formHander,omitempty"`
 }
 
@@ -92,10 +93,7 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 
 		argsLen := methodInfo.Type.NumIn() - 1
 		directMethodName := firstCharToLower(methodInfo.Name)
-		directMethod := DirectMethod{
-			Name: directMethodName,
-			Len: argsLen,
-		}
+		directMethod := DirectMethod{Name: directMethodName}
 
 		if debug {
 			log.Print(fmt.Sprintf("\t\twith args len = %v", argsLen))
@@ -111,12 +109,16 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 			if tagsField.Tag.Get("formhandler") == "true" {
 				directMethod.FormHandler = new(bool)
 				*directMethod.FormHandler = true
-				directMethod.Len = 0
 			}
 		} else {
 			if debug {
 				log.Print("\t\t\tno tags found")
 			}
+		}
+
+		if  directMethod.FormHandler == nil {
+			directMethod.Len = new(int)
+			*directMethod.Len = argsLen
 		}
 
 		directAction = append(directAction, directMethod)

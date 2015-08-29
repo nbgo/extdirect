@@ -135,7 +135,7 @@ func TestExtDirect(t *testing.T) {
 					So(exists, ShouldBeTrue)
 					So(method.(DirectMethod).Name, ShouldEqual, "test")
 					Convey("with no arguments", func() {
-						So(method.(DirectMethod).Len, ShouldBeZeroValue)
+						So(*method.(DirectMethod).Len, ShouldBeZeroValue)
 					});
 				})
 				Convey("getRecords", func() {
@@ -150,7 +150,7 @@ func TestExtDirect(t *testing.T) {
 					So(exists, ShouldBeTrue)
 					So(method.(DirectMethod).Name, ShouldEqual, "getRecords")
 					Convey("with 1 argument", func() {
-						So(method.(DirectMethod).Len, ShouldEqual, 1)
+						So(*method.(DirectMethod).Len, ShouldEqual, 1)
 					});
 				})
 				Convey("testEcho1", func() {
@@ -165,7 +165,7 @@ func TestExtDirect(t *testing.T) {
 					So(exists, ShouldBeTrue)
 					So(method.(DirectMethod).Name, ShouldEqual, "testEcho1")
 					Convey("with 1 argument", func() {
-						So(method.(DirectMethod).Len, ShouldEqual, 1)
+						So(*method.(DirectMethod).Len, ShouldEqual, 1)
 					});
 				})
 				Convey("testEcho2", func() {
@@ -180,7 +180,7 @@ func TestExtDirect(t *testing.T) {
 					So(exists, ShouldBeTrue)
 					So(method.(DirectMethod).Name, ShouldEqual, "testEcho2")
 					Convey("with 7 arguments", func() {
-						So(method.(DirectMethod).Len, ShouldEqual, 7)
+						So(*method.(DirectMethod).Len, ShouldEqual, 7)
 					});
 				})
 				Convey("updateBasicInfo", func() {
@@ -198,8 +198,8 @@ func TestExtDirect(t *testing.T) {
 						So(method.(DirectMethod).FormHandler, ShouldNotBeNil)
 						So(*method.(DirectMethod).FormHandler, ShouldBeTrue)
 					});
-					Convey("has 0 arguments", func() {
-						So(method.(DirectMethod).Len, ShouldEqual, 0)
+					Convey("has no len property", func() {
+						So(method.(DirectMethod).Len, ShouldBeNil)
 					});
 				})
 			})
@@ -208,10 +208,10 @@ func TestExtDirect(t *testing.T) {
 		Convey("Action with methods serialization", func() {
 			jsonText, err := provider.Json()
 			So(err, ShouldBeNil)
-			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
+			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
 			javaScript, err2 := provider.JavaScript()
 			So(err2, ShouldBeNil)
-			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
+			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
 		})
 
 		Convey("Duplicated registration", func() {
@@ -400,7 +400,7 @@ func TestExtDirect(t *testing.T) {
 						body, err := ioutil.ReadAll(res.Body)
 						res.Body.Close()
 						So(err, ShouldBeNil)
-						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","len":0,"formHander":true}]}}`)
+						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
 					})
 				})
 			})
