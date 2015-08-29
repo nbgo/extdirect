@@ -16,6 +16,7 @@ const (
 )
 
 type DirectServiceProvider struct {
+	Id          *string `json:"id,omitempty"`
 	Type        DirectServiceProviderType `json:"type"`
 	Url         string `json:"url"`
 	Namespace   string `json:"namespace"`
