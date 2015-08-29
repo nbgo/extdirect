@@ -9,8 +9,14 @@ import (
 
 type DirectMethodTags struct {}
 
+type DirectServiceProviderType string
+const (
+	RemotingProvider DirectServiceProviderType = "remoting"
+	PollingProvider DirectServiceProviderType = "polling"
+)
+
 type DirectServiceProvider struct {
-	Type        string `json:"type"`
+	Type        DirectServiceProviderType `json:"type"`
 	Url         string `json:"url"`
 	Namespace   string `json:"namespace"`
 	Timeout     int `json:"timeout"`
@@ -131,7 +137,7 @@ func init() {
 
 func NewProvider() (provider *DirectServiceProvider) {
 	provider = &DirectServiceProvider{
-		Type: "remoting",
+		Type: RemotingProvider,
 		Namespace: "DirectApi",
 		Url: "/directapi",
 		Timeout: 30000,
