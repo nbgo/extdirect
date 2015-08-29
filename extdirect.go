@@ -36,9 +36,15 @@ type DirectMethod struct {
 	FormHandler *bool `json:"formHander,omitempty"`
 }
 
+type DirectFormHandlerResult struct {
+	Errors  map[string]string `json:"errors,omitempty"`
+	Success bool `json:"success"`
+}
+
 type directActionInfo struct {
-	Type    reflect.Type
-	Methods map[string]reflect.Method
+	Type          reflect.Type
+	Methods       map[string]reflect.Method
+	DirectMethods map[string]DirectMethod
 }
 
 func (this *DirectServiceProvider) Json() (string, error) {
@@ -79,6 +85,7 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	methodsLen := typeInfo.NumMethod()
 	directAction := make([]DirectMethod, 0)
 	methods := make(map[string]reflect.Method, 0)
+	directMethods := make(map[string]DirectMethod, 0)
 
 	if debug {
 		log.Print(fmt.Sprintf("\twith %v methods", methodsLen))
@@ -116,19 +123,21 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 			}
 		}
 
-		if  directMethod.FormHandler == nil {
+		if directMethod.FormHandler == nil {
 			directMethod.Len = new(int)
 			*directMethod.Len = argsLen
 		}
 
 		directAction = append(directAction, directMethod)
 		methods[directMethodName] = methodInfo
+		directMethods[directMethodName] = directMethod
 	}
 
 	this.Actions[actionTypeName] = directAction
 	this.actionsInfo[actionTypeName] = directActionInfo{
 		Type: typeInfo,
 		Methods: methods,
+		DirectMethods: directMethods,
 	}
 }
 

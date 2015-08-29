@@ -51,8 +51,8 @@ type response struct {
 	Tid     int `json:"tid"`
 	Action  string `json:"action"`
 	Method  string `json:"method"`
-	Message string `json:"message"`
-	Result  interface{} `json:"result"`
+	Message *string `json:"message,omitempty"`
+	Result  interface{} `json:"result,omitempty"`
 }
 
 func Api(provider *DirectServiceProvider) func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +82,9 @@ func ActionsHandlerCtx(provider *DirectServiceProvider) func(c context.Context, 
 
 func actionHandler(provider *DirectServiceProvider, c context.Context, w http.ResponseWriter, r *http.Request) {
 	var reqs []*request
+	var err error
 	contentType := r.Header.Get("Content-Type")
+	isFormHandler := false
 
 	switch {
 	case strings.HasPrefix(contentType, "application/json"):
@@ -90,12 +92,20 @@ func actionHandler(provider *DirectServiceProvider, c context.Context, w http.Re
 	case strings.HasPrefix(contentType, "application/x-www-form-urlencoded"):
 		r.ParseForm()
 		reqs = mustDecodeFormPost(r.Form)
+		isFormHandler = true
 	default:
 		panic(ErrInvalidContentType(contentType))
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	if err := json.NewEncoder(w).Encode(provider.processRequests(c, r, reqs)); err != nil {
+	if !isFormHandler {
+		err = json.NewEncoder(w).Encode(provider.processRequests(c, r, reqs))
+	} else {
+		resps := provider.processRequests(c, r, reqs)
+		err = json.NewEncoder(w).Encode(resps[0])
+
+	}
+	if err != nil {
 		panic(err)
 	}
 }
@@ -122,16 +132,17 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 				if err := recover(); err != nil {
 					log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
 					resp.Type = "exception"
-					resp.Message = fmt.Sprintf("%v", err)
+					respMessage := fmt.Sprintf("%v", err)
+					resp.Message = &respMessage
 				}
 				respsChannel <- resp
 			}()
 
 			// Create instance of action type
-			if this.debug {
-				log.Print(fmt.Sprintf("Create instance of action %s", req.Action))
-			}
 			actionInfo := this.actionsInfo[req.Action]
+			if this.debug {
+				log.Print(fmt.Sprintf("Create instance of action %s (type %v)", req.Action, actionInfo.Type))
+			}
 			actionVal := reflect.New(actionInfo.Type).Elem()
 
 			// Set context and request
@@ -169,35 +180,53 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 				}
 			}
 
-			// Call action method
 			if this.debug {
 				log.Print(fmt.Sprintf("Prepare arguments for method %s.%s", req.Action, req.Method))
 			}
 			methodInfo := actionInfo.Methods[req.Method]
+			directMethod := actionInfo.DirectMethods[req.Method]
+			if this.debug {
+				log.Print(fmt.Sprintf("Direct method to use: %s, formhandler=%v", directMethod.Name, directMethod.FormHandler))
+			}
 			methodArgsLen := methodInfo.Type.NumIn() - 1
 			var args []reflect.Value
 			if req.Data != nil {
-				args = make([]reflect.Value, methodArgsLen)
-				for i, arg := range req.Data.([]interface{}) {
-					if this.debug {
-						log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
-					}
-					convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
-					if this.debug {
-						log.Print(fmt.Sprintf("Converted arg #%v type is %T", i, convertedArg))
-					}
-					args[i] = reflect.ValueOf(convertedArg)
+				if this.debug {
+					log.Print(fmt.Sprintf("Type of request data is %T", req.Data))
 				}
-			}
-			if this.debug {
-				log.Print(fmt.Sprintf("Call method %s.%s", req.Action, req.Method))
+				if directMethod.FormHandler != nil {
+					if this.debug {
+						log.Print("Prepare arguments for form handler call.")
+					}
+					args = make([]reflect.Value, 1)
+					args[0] = reflect.ValueOf(req.Data.(map[string]string))
+					// TODO: Support structure type argument for form handler.
+				} else {
+					args = make([]reflect.Value, methodArgsLen)
+					for i, arg := range req.Data.([]interface{}) {
+						if this.debug {
+							log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
+						}
+						convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
+						if this.debug {
+							log.Print(fmt.Sprintf("Converted arg #%v type is %T", i, convertedArg))
+						}
+						args[i] = reflect.ValueOf(convertedArg)
+					}
+				}
 			}
 
 			if this.profile {
 				profilingStarted = true
 				tStart = time.Now()
 			}
+
+			if this.debug {
+				log.Print(fmt.Sprintf("Call method %s.%s", req.Action, req.Method))
+			}
+			// Call action method.
 			resultsValues := actionVal.MethodByName(methodInfo.Name).Call(args)
+
 			if profilingStarted {
 				duration := time.Now().Sub(tStart)
 				log.Print("info: ", fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
@@ -208,7 +237,8 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 					if err, isErr := resultValue.Interface().(error); isErr {
 						log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
 						resp.Type = "exception"
-						resp.Message = fmt.Sprintf("%v", err)
+						respMessage := fmt.Sprintf("%v", err)
+						resp.Message = &respMessage
 						resp.Result = nil
 						break;
 					}

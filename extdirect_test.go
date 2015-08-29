@@ -22,7 +22,7 @@ import (
 )
 
 var providerDebug = true
-var providerProfile = true
+var providerProfile = false
 
 type GetDataRequest struct {
 	Page   int
@@ -89,10 +89,15 @@ func (this Db) TestException3() (string, error) {
 func (this Db) TestException4() {
 	panic(errors.New("Error example #4"))
 }
-func (this Db) UpdateBasicInfo() {
+func (this Db) UpdateBasicInfo(data map[string]string) (result *DirectFormHandlerResult) {
+	result = &DirectFormHandlerResult{Success:true}
+	if data["email"] == "aaron@sencha.com" {
+		result.Success = false
+		result.Errors = make(map[string]string, 0)
+		result.Errors["email"] = "already exists"
+	}
+	return
 }
-
-
 
 func getResponseByTid(responses []*response, tid int) *response {
 	resp, _, _ := From(responses).FirstBy(func(x T) (bool, error) {
@@ -241,12 +246,12 @@ func TestExtDirect(t *testing.T) {
 				So(resps[0].Result, ShouldBeEmpty)
 				So(resps[0].Tid, ShouldEqual, 1)
 				So(resps[0].Type, ShouldEqual, "rpc")
-				So(resps[0].Message, ShouldBeEmpty)
+				So(resps[0].Message, ShouldBeNil)
 				Convey("which is serialized correctly", func() {
 					s, err := json.Marshal(resps)
 					So(err, ShouldBeNil)
 					// Response is always array even for single request
-					So(string(s), ShouldEqual, `[{"type":"rpc","tid":1,"action":"Db","method":"test","message":"","result":""}]`)
+					So(string(s), ShouldEqual, `[{"type":"rpc","tid":1,"action":"Db","method":"test","result":""}]`)
 				})
 			})
 		})
@@ -284,7 +289,7 @@ func TestExtDirect(t *testing.T) {
 				So(len(resps), ShouldEqual, 2)
 
 				testEcho1Resp := getResponseByTid(resps, 1);
-				So(testEcho1Resp.Message, ShouldBeEmpty)
+				So(testEcho1Resp.Message, ShouldBeNil)
 				So(testEcho1Resp.Type, ShouldEqual, "rpc")
 				So(testEcho1Resp.Action, ShouldEqual, "Db")
 				So(testEcho1Resp.Method, ShouldEqual, "testEcho1")
@@ -292,7 +297,7 @@ func TestExtDirect(t *testing.T) {
 				So(testEcho1Resp.Tid, ShouldEqual, 1)
 
 				testEcho2Resp := getResponseByTid(resps, 2);
-				So(testEcho2Resp.Message, ShouldBeEmpty)
+				So(testEcho2Resp.Message, ShouldBeNil)
 				So(testEcho2Resp.Type, ShouldEqual, "rpc")
 				So(testEcho2Resp.Action, ShouldEqual, "Db")
 				So(testEcho2Resp.Method, ShouldEqual, "testEcho2")
@@ -301,8 +306,8 @@ func TestExtDirect(t *testing.T) {
 				Convey("which is serialized correctly", func() {
 					s, err := json.Marshal(resps)
 					So(err, ShouldBeNil)
-					So(string(s), ShouldContainSubstring, `{"type":"rpc","tid":1,"action":"Db","method":"testEcho1","message":"","result":"Hello!"}`)
-					So(string(s), ShouldContainSubstring, `{"type":"rpc","tid":2,"action":"Db","method":"testEcho2","message":"","result":"Hello12340"}`)
+					So(string(s), ShouldContainSubstring, `{"type":"rpc","tid":1,"action":"Db","method":"testEcho1","result":"Hello!"}`)
+					So(string(s), ShouldContainSubstring, `{"type":"rpc","tid":2,"action":"Db","method":"testEcho2","result":"Hello12340"}`)
 				})
 			})
 		})
@@ -329,7 +334,7 @@ func TestExtDirect(t *testing.T) {
 			})
 			Convey("with correct message each", func() {
 				for _, resp := range resps {
-					So(resp.Message, ShouldContainSubstring, "Error example #")
+					So(*resp.Message, ShouldContainSubstring, "Error example #")
 				}
 			})
 		})
@@ -344,7 +349,7 @@ func TestExtDirect(t *testing.T) {
 		Convey("processed with correct result", func() {
 			resps := provider.processRequests(nil, nil, reqs)
 			So(len(resps), ShouldEqual, 1)
-			So(resps[0].Message, ShouldBeEmpty)
+			So(resps[0].Message, ShouldBeNil)
 			So(resps[0].Type, ShouldEqual, "rpc")
 			So(resps[0].Result, ShouldEqual, `model= page=1 start=0 limit=25 sort=[{text ASC}]`)
 		})
@@ -363,7 +368,7 @@ func TestExtDirect(t *testing.T) {
 			},
 		}, context.Background()), &http.Request{Host: "test2"}, reqs)
 		So(len(resps), ShouldEqual, 1)
-		So(resps[0].Message, ShouldBeEmpty)
+		So(resps[0].Message, ShouldBeNil)
 		So(resps[0].Type, ShouldEqual, "rpc")
 		So(resps[0].Result, ShouldEqual, "test1TestUsertest2")
 	})
@@ -417,7 +422,7 @@ func TestExtDirect(t *testing.T) {
 						res.Body.Close()
 						So(err, ShouldBeNil)
 						fmt.Println(string(body))
-						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","message":"","result":"TestUser127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
+						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","result":"TestUser127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
 					})
 				})
 			})
@@ -434,7 +439,61 @@ func TestExtDirect(t *testing.T) {
 						res.Body.Close()
 						So(err, ShouldBeNil)
 						fmt.Println(string(body))
-						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","message":"","result":"127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
+						So(MatchesRegexp(`\[{"type":"rpc","tid":33,"action":"Db","method":"test","result":"127\.0\.0\.1:\d+"}]`).Matches(string(body)), ShouldBeNil)
+					})
+				})
+			})
+		})
+
+		Convey("API handler request to exception method", func() {
+			res, err := http.Post(srv.URL + provider.Url, "application/json", strings.NewReader(`{"action":"Db","method":"testException1","data":null,"type":"rpc","tid":40}`))
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "application/json; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						bodyString := strings.TrimSuffix(string(body), "\n")
+						So(err, ShouldBeNil)
+						fmt.Println(bodyString)
+						So(bodyString, ShouldEqual, `[{"type":"exception","tid":40,"action":"Db","method":"testException1","message":"Error example #1"}]`)
+					})
+				})
+			})
+		})
+
+		Convey("API handler request to form handler", func() {
+			res, err := http.Post(srv.URL + "/directapi", "application/x-www-form-urlencoded; charset=UTF-8", strings.NewReader(`extTID=1&extAction=Db&extMethod=updateBasicInfo&extType=rpc&extUpload=false&foo=bar&uid=34&name=Aaron%20Conran&email=aaron%40sencha1.com&company=Sencha%20Inc.`))
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "application/json; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						bodyString := strings.TrimSuffix(string(body), "\n")
+						So(err, ShouldBeNil)
+						fmt.Println(bodyString)
+						So(bodyString, ShouldEqual, `{"type":"rpc","tid":1,"action":"Db","method":"updateBasicInfo","result":{"success":true}}`)
+					})
+				})
+			})
+		})
+
+		Convey("API handler request to form handler returning validation error", func() {
+			res, err := http.Post(srv.URL + "/directapi", "application/x-www-form-urlencoded; charset=UTF-8", strings.NewReader(`extTID=1&extAction=Db&extMethod=updateBasicInfo&extType=rpc&extUpload=false&foo=bar&uid=34&name=Aaron%20Conran&email=aaron%40sencha.com&company=Sencha%20Inc.`))
+			Convey("should be processed without error", func() {
+				So(err, ShouldBeNil)
+				Convey("have correct content type", func() {
+					So(res.Header.Get("Content-Type"), ShouldEqual, "application/json; charset=utf-8")
+					Convey("and return expected body", func() {
+						body, err := ioutil.ReadAll(res.Body)
+						res.Body.Close()
+						bodyString := strings.TrimSuffix(string(body), "\n")
+						So(err, ShouldBeNil)
+						fmt.Println(bodyString)
+						So(bodyString, ShouldEqual, `{"type":"rpc","tid":1,"action":"Db","method":"updateBasicInfo","result":{"errors":{"email":"already exists"},"success":false}}`)
 					})
 				})
 			})
