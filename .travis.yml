@@ -22,6 +22,7 @@ install:
   - go get github.com/goji/context
   - go get github.com/jacobsa/oglematchers
   - go get code.google.com/p/go.net/context
+  - go get github.com/phayes/errors
 
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic
