@@ -83,6 +83,18 @@ func (this Db) TestException3() (string, error) {
 func (this Db) TestException4() {
 	panic(errors.New("Error example #4"))
 }
+func (this Db) GetBasicInfo(uid int, foo string) map[string]interface{} {
+	return map[string]interface{}{"success": true, "data":map[string]string{"company": "Sencha Inc.", "email":"aaron@sencha.com", "name":foo}}
+}
+func (this Db) UpdateBasicInfo(data map[string]string) (result *extdirect.DirectFormHandlerResult) {
+	result = &extdirect.DirectFormHandlerResult{Success:true}
+	if data["email"] == "aaron@sencha.com" {
+		result.Success = false
+		result.Errors = make(map[string]string, 0)
+		result.Errors["email"] = "already exists"
+	}
+	return
+}
 
 func main() {
 	extdirect.Provider.RegisterAction(reflect.TypeOf(Db{}))

@@ -4,9 +4,10 @@ Ext.application({
 
 	launch: function () {
 		var me = this,
-			store;
+			store, basicInfo;
 
 		Ext.direct.Manager.addProvider(DirectApi.REMOTE_API);
+		Ext.tip.QuickTipManager.init();
 
 		store = Ext.create('Ext.data.Store', {
 			fields: ['id', 'text'],
@@ -57,39 +58,102 @@ Ext.application({
 					}
 				},
 				{
-					xtype: 'grid',
+					xtype: 'container',
 					flex: 1,
-					store: store,
-					columns: [
+					layout: 'hbox',
+					items: [
 						{
-							text: 'Id',
-							dataIndex: 'id',
-							width: 100
+							xtype: 'grid',
+							flex: 1,
+							store: store,
+							columns: [
+								{
+									text: 'Id',
+									dataIndex: 'id',
+									width: 100
+								},
+								{
+									text: 'Text',
+									dataIndex: 'text',
+									flex: 1
+								}
+							],
+							tbar: [
+								{
+									xtype: 'button',
+									text: 'Load',
+									handler: function () {
+										store.load();
+									}
+								},
+								{
+									xtype: 'button',
+									text: 'Reload',
+									handler: function () {
+										store.reload();
+									}
+								}
+							]
 						},
-						{
-							text: 'Text',
-							dataIndex: 'text',
-							flex: 1
-						}
-					],
-					tbar: [
-						{
-							xtype: 'button',
-							text: 'Load',
-							handler: function () {
-								store.load();
-							}
-						},
-						{
-							xtype: 'button',
-							text: 'Reload',
-							handler: function () {
-								store.reload();
-							}
-						}
+						basicInfo = Ext.widget('form',{
+							flex: 1,
+							title: 'Basic Information',
+							border: false,
+							bodyPadding: 10,
+							// configs for BasicForm
+							api: {
+								// The server-side method to call for load() requests
+								load: 'Db.getBasicInfo',
+								// The server-side must mark the submit handler as a 'formHandler'
+								submit: 'Db.updateBasicInfo'
+							},
+							// specify the order for the passed params
+							paramOrder: ['uid', 'foo'],
+							dockedItems: [{
+								dock: 'bottom',
+								xtype: 'toolbar',
+								ui: 'footer',
+								style: 'margin: 0 5px 5px 0;',
+								items: ['->', {
+									text: 'Submit',
+									handler: function () {
+										basicInfo.getForm().submit({
+											params: {
+												foo: 'bar',
+												uid: 34
+											}
+										});
+									}
+								}]
+							}],
+							defaultType: 'textfield',
+							defaults: {
+								anchor: '100%'
+							},
+							items: [{
+								fieldLabel: 'Name',
+								name: 'name'
+							}, {
+								fieldLabel: 'Email',
+								msgTarget: 'side',
+								vtype: 'email',
+								name: 'email'
+							}, {
+								fieldLabel: 'Company',
+								name: 'company'
+							}]
+						})
 					]
 				}
 			]
+		});
+
+		basicInfo.getForm().load({
+			// pass 2 arguments to server side getBasicInfo method (len=2)
+			params: {
+				foo: 'bar',
+				uid: 34
+			}
 		});
 	},
 
