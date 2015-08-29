@@ -234,7 +234,7 @@ func mustDecodeFormPost(f url.Values) []*request {
 		Action: f["extAction"][0],
 		Method: f["extMethod"][0],
 	}
-	tid, tidErr := strconv.Atoi(f["extMethod"][0]);
+	tid, tidErr := strconv.Atoi(f["extTID"][0]);
 	if tidErr != nil {
 		panic(errors.Wraps(tidErr, "failed to decode form post: could not parse TID"))
 	}
@@ -242,7 +242,7 @@ func mustDecodeFormPost(f url.Values) []*request {
 	upload, hasUpload := f["extUpload"]
 	req.Upload = hasUpload && strings.ToLower(upload[0]) == "true"
 
-	data := make(map[string]interface{}, 0)
+	data := make(map[string]string, 0)
 	for k, v := range f {
 		if k == "extType" || k == "extTID" || k == "extAction" || k == "extMethod" || k == "extUpload" {
 			continue
