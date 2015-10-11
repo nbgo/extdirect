@@ -11,6 +11,11 @@ type logger interface {
 	Print(v ...interface{})
 }
 
+const (
+	logLevelInfo = "info: "
+	logLevelWarn = "warn: "
+)
+
 var log logger = stdlog.New(os.Stderr, "", stdlog.LstdFlags)
 
 func SetLogger(l logger) {
@@ -45,8 +50,8 @@ func (this *LogrusLogger) Print(v ...interface{}) {
 
 		m := strings.TrimSpace(v[1].(string))
 		switch strings.TrimSpace(v[0].(string)) {
-		case "info:": l.Info(m)
-		case "warn:": l.Warn(m)
+		case logLevelInfo: l.Info(m)
+		case logLevelWarn: l.Warn(m)
 		}
 	}
 }

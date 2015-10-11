@@ -138,7 +138,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 			defer func() {
 				if profilingStarted {
 					duration := time.Now().Sub(tStart)
-					log.Print("info: ", fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
+					log.Print(logLevelInfo, fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
 					profilingStarted = false
 				}
 				if err := recover(); err != nil {
@@ -176,7 +176,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						} else {
 							if this.debug {
-								log.Print("warn: ", "Context cannot be set to action instance because context is nil.")
+								log.Print(logLevelWarn, "Context cannot be set to action instance because context is nil.")
 							}
 						}
 					}
@@ -241,7 +241,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 
 			if profilingStarted {
 				duration := time.Now().Sub(tStart)
-				log.Print("info: ", fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
+				log.Print(logLevelInfo, fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
 				profilingStarted = false
 			}
 			for i, resultValue := range resultsValues {
