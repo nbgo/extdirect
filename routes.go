@@ -12,8 +12,20 @@ import (
 	"golang.org/x/net/context"
 	"net/url"
 	"strconv"
-	"github.com/phayes/errors"
+	"github.com/nbgo/fail"
 )
+
+type ErrDecodeFromPostRequest struct {
+	Details string
+	Reason  error
+}
+func (this *ErrDecodeFromPostRequest) Error() string {
+	return fmt.Sprintf("Failed to decode form post: %v. Reason: %v", this.Details, this.Reason)
+}
+func (this *ErrDecodeFromPostRequest) InnerError() error {
+	return this.Reason
+}
+
 
 type ErrInvalidContentType string
 func (this ErrInvalidContentType) Error() string {
@@ -164,7 +176,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 							actionVal.Field(i).Set(reflect.ValueOf(c))
 						} else {
 							if this.debug {
-								log.Print("warn:", "Context cannot be set to action instance because context is nil.")
+								log.Print("warn: ", "Context cannot be set to action instance because context is nil.")
 							}
 						}
 					}
@@ -266,7 +278,7 @@ func mustDecodeFormPost(f url.Values) []*request {
 	}
 	tid, tidErr := strconv.Atoi(f["extTID"][0]);
 	if tidErr != nil {
-		panic(errors.Wraps(tidErr, "failed to decode form post: could not parse TID"))
+		panic(fail.New(&ErrDecodeFromPostRequest{"could not parse TID", tidErr}))
 	}
 	req.Tid = tid
 	upload, hasUpload := f["extUpload"]

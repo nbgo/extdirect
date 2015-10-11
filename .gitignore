@@ -30,7 +30,6 @@ temp/
 *.vs10x
 *.GhostDoc.user.dic
 TestsLog.xml
-*.log
 installer/Setup Files/
 installer/setup-cache/
 *.GhostDoc.xml

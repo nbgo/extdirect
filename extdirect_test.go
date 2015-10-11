@@ -14,11 +14,11 @@ import (
 	"github.com/zenazn/goji/web"
 	"github.com/Sirupsen/logrus"
 	"errors"
-	"code.google.com/p/go.net/context"
 	gcontext "github.com/goji/context"
 	"net/http/httptest"
 	"io/ioutil"
 	. "github.com/jacobsa/oglematchers"
+	"golang.org/x/net/context"
 )
 
 var providerDebug = true
