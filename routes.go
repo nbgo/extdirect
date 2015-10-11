@@ -29,7 +29,7 @@ func (this *ErrDecodeFromPostRequest) InnerError() error {
 
 type ErrInvalidContentType string
 func (this ErrInvalidContentType) Error() string {
-	return fmt.Sprintf("invalid content type: %s", string(this))
+	return fmt.Sprintf("Invalid content type: %s.", string(this))
 }
 
 type ErrTypeConversion struct {
@@ -37,7 +37,7 @@ type ErrTypeConversion struct {
 	TargetType reflect.Type
 }
 func (this *ErrTypeConversion) Error() string {
-	return fmt.Sprintf("cannot convert type %v to type %v", this.SourceType, this.TargetType)
+	return fmt.Sprintf("Cannot convert type %v to type %v.", this.SourceType, this.TargetType)
 }
 
 type ErrDirectActionMethod struct {
@@ -46,7 +46,7 @@ type ErrDirectActionMethod struct {
 	Err    interface{}
 }
 func (this *ErrDirectActionMethod) Error() string {
-	return fmt.Sprintf("error serving %v.%v(): %v", this.Action, this.Method, this.Err)
+	return fmt.Sprintf("Error serving %v.%v(): %v", this.Action, this.Method, this.Err)
 }
 
 type request struct {
@@ -142,7 +142,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 					profilingStarted = false
 				}
 				if err := recover(); err != nil {
-					log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
+					log.Print(fail.New(&ErrDirectActionMethod{req.Action, req.Method, err}))
 					resp.Type = "exception"
 					respMessage := fmt.Sprintf("%v", err)
 					resp.Message = &respMessage
