@@ -49,9 +49,11 @@ func (this *LogrusLogger) Print(v ...interface{}) {
 		}
 
 		m := strings.TrimSpace(v[1].(string))
-		switch strings.TrimSpace(v[0].(string)) {
+		logLevel := v[0].(string)
+		switch logLevel {
 		case logLevelInfo: l.Info(m)
 		case logLevelWarn: l.Warn(m)
+		default: stdlog.Panicf("Unknow log message type: '%v'", logLevel)
 		}
 	}
 }
