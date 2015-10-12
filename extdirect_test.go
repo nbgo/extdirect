@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	. "github.com/jacobsa/oglematchers"
 	"golang.org/x/net/context"
+	"github.com/nbgo/fail"
 )
 
 var providerDebug = true
@@ -81,10 +82,10 @@ func (this Db) TestException1() {
 	panic("Error example #1")
 }
 func (this Db) TestException2() error {
-	return errors.New("Error example #2")
+	return fail.News("Error example #2")
 }
 func (this Db) TestException3() (string, error) {
-	return "test", errors.New("Error example #3")
+	return "test", fail.News("Error example #3")
 }
 func (this Db) TestException4() {
 	panic(errors.New("Error example #4"))

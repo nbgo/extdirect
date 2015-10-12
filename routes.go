@@ -41,12 +41,13 @@ func (this *ErrTypeConversion) Error() string {
 }
 
 type ErrDirectActionMethod struct {
-	Action string
-	Method string
-	Err    interface{}
+	Action  string
+	Method  string
+	Err     interface{}
+	isPanic bool
 }
 func (this *ErrDirectActionMethod) Error() string {
-	return fmt.Sprintf("Error serving %v.%v(): %v", this.Action, this.Method, this.Err)
+	return fmt.Sprintf("Error executing %v.%v(): %v", this.Action, this.Method, this.Err)
 }
 
 type request struct {
@@ -142,7 +143,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 					profilingStarted = false
 				}
 				if err := recover(); err != nil {
-					log.Print(fail.New(&ErrDirectActionMethod{req.Action, req.Method, err}))
+					log.Print(fail.New(&ErrDirectActionMethod{req.Action, req.Method, err, true}))
 					resp.Type = "exception"
 					respMessage := fmt.Sprintf("%v", err)
 					resp.Message = &respMessage
@@ -247,7 +248,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 			for i, resultValue := range resultsValues {
 				if methodInfo.Type.Out(i).Name() == "error" {
 					if err, isErr := resultValue.Interface().(error); isErr {
-						log.Print(&ErrDirectActionMethod{req.Action, req.Method, err})
+						log.Print(&ErrDirectActionMethod{req.Action, req.Method, err, false})
 						resp.Type = "exception"
 						respMessage := fmt.Sprintf("%v", err)
 						resp.Message = &respMessage
@@ -326,7 +327,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(v)
 			case reflect.Int32: return int32(v)
 			case reflect.Float32: return float32(v)
-			default: panic(&ErrTypeConversion{sourceType, argType})
+			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
 			}
 		case nil:
 			switch argType.Kind() {
@@ -335,7 +336,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(0)
 			case reflect.Int32: return int32(0)
 			case reflect.String: return ""
-			default: panic(&ErrTypeConversion{sourceType, argType})
+			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
 			}
 		case map[string]interface{}:
 			switch argType.Kind() {
@@ -345,7 +346,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 				structInstanceRef := structInstanceValue.Addr().Interface()
 				mapstructure.Decode(v, structInstanceRef)
 				return structInstanceValue.Interface()
-			default: panic(&ErrTypeConversion{sourceType, argType})
+			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
 			}
 		}
 	}
