@@ -20,7 +20,7 @@ type ErrDecodeFromPostRequest struct {
 	Reason  error
 }
 func (this *ErrDecodeFromPostRequest) Error() string {
-	return fmt.Sprintf("Failed to decode form post: %v. Reason: %v", this.Details, this.Reason)
+	return fmt.Sprintf("failed to decode form post: %v: %v", this.Details, this.Reason)
 }
 func (this *ErrDecodeFromPostRequest) InnerError() error {
 	return this.Reason
@@ -29,7 +29,7 @@ func (this *ErrDecodeFromPostRequest) InnerError() error {
 
 type ErrInvalidContentType string
 func (this ErrInvalidContentType) Error() string {
-	return fmt.Sprintf("Invalid content type: %s.", string(this))
+	return fmt.Sprintf("invalid content type: %s", string(this))
 }
 
 type ErrTypeConversion struct {
@@ -37,7 +37,7 @@ type ErrTypeConversion struct {
 	TargetType reflect.Type
 }
 func (this *ErrTypeConversion) Error() string {
-	return fmt.Sprintf("Cannot convert type %v to type %v.", this.SourceType, this.TargetType)
+	return fmt.Sprintf("cannot convert type %v to type %v", this.SourceType, this.TargetType)
 }
 
 type ErrDirectActionMethod struct {
@@ -47,7 +47,7 @@ type ErrDirectActionMethod struct {
 	isPanic bool
 }
 func (this *ErrDirectActionMethod) Error() string {
-	return fmt.Sprintf("Error executing %v.%v(): %v", this.Action, this.Method, this.Err)
+	return fmt.Sprintf("error executing %v.%v(): %v", this.Action, this.Method, this.Err)
 }
 
 type request struct {
