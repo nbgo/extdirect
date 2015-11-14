@@ -113,7 +113,7 @@ func TestExtDirect(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	Convey("Default provider serialization", t, func() {
-		value, err := Provider.Json()
+		value, err := Provider.JSON()
 		So(err, ShouldBeNil)
 		So(value, ShouldEqual, "{\"type\":\"remoting\",\"url\":\"/directapi\",\"namespace\":\"DirectApi\",\"timeout\":30000,\"actions\":{}}")
 	})
@@ -131,7 +131,7 @@ func TestExtDirect(t *testing.T) {
 				So(len(provider.Actions["Db"]), ShouldEqual, 9)
 				Convey("test", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
-						if m, ok := x.(DirectMethod); ok {
+						if m, ok := x.(directMethod); ok {
 							return m.Name == "test", nil
 						} else {
 							return false, nil
@@ -139,14 +139,14 @@ func TestExtDirect(t *testing.T) {
 					})
 					So(err, ShouldBeNil)
 					So(exists, ShouldBeTrue)
-					So(method.(DirectMethod).Name, ShouldEqual, "test")
+					So(method.(directMethod).Name, ShouldEqual, "test")
 					Convey("with no arguments", func() {
-						So(*method.(DirectMethod).Len, ShouldBeZeroValue)
+						So(*method.(directMethod).Len, ShouldBeZeroValue)
 					});
 				})
 				Convey("getRecords", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
-						if m, ok := x.(DirectMethod); ok {
+						if m, ok := x.(directMethod); ok {
 							return m.Name == "getRecords", nil
 						} else {
 							return false, nil
@@ -154,14 +154,14 @@ func TestExtDirect(t *testing.T) {
 					})
 					So(err, ShouldBeNil)
 					So(exists, ShouldBeTrue)
-					So(method.(DirectMethod).Name, ShouldEqual, "getRecords")
+					So(method.(directMethod).Name, ShouldEqual, "getRecords")
 					Convey("with 1 argument", func() {
-						So(*method.(DirectMethod).Len, ShouldEqual, 1)
+						So(*method.(directMethod).Len, ShouldEqual, 1)
 					});
 				})
 				Convey("testEcho1", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
-						if m, ok := x.(DirectMethod); ok {
+						if m, ok := x.(directMethod); ok {
 							return m.Name == "testEcho1", nil
 						} else {
 							return false, nil
@@ -169,14 +169,14 @@ func TestExtDirect(t *testing.T) {
 					})
 					So(err, ShouldBeNil)
 					So(exists, ShouldBeTrue)
-					So(method.(DirectMethod).Name, ShouldEqual, "testEcho1")
+					So(method.(directMethod).Name, ShouldEqual, "testEcho1")
 					Convey("with 1 argument", func() {
-						So(*method.(DirectMethod).Len, ShouldEqual, 1)
+						So(*method.(directMethod).Len, ShouldEqual, 1)
 					});
 				})
 				Convey("testEcho2", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
-						if m, ok := x.(DirectMethod); ok {
+						if m, ok := x.(directMethod); ok {
 							return m.Name == "testEcho2", nil
 						} else {
 							return false, nil
@@ -184,14 +184,14 @@ func TestExtDirect(t *testing.T) {
 					})
 					So(err, ShouldBeNil)
 					So(exists, ShouldBeTrue)
-					So(method.(DirectMethod).Name, ShouldEqual, "testEcho2")
+					So(method.(directMethod).Name, ShouldEqual, "testEcho2")
 					Convey("with 7 arguments", func() {
-						So(*method.(DirectMethod).Len, ShouldEqual, 7)
+						So(*method.(directMethod).Len, ShouldEqual, 7)
 					});
 				})
 				Convey("updateBasicInfo", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
-						if m, ok := x.(DirectMethod); ok {
+						if m, ok := x.(directMethod); ok {
 							return m.Name == "updateBasicInfo", nil
 						} else {
 							return false, nil
@@ -199,20 +199,20 @@ func TestExtDirect(t *testing.T) {
 					})
 					So(err, ShouldBeNil)
 					So(exists, ShouldBeTrue)
-					So(method.(DirectMethod).Name, ShouldEqual, "updateBasicInfo")
+					So(method.(directMethod).Name, ShouldEqual, "updateBasicInfo")
 					Convey("marked as form handler", func() {
-						So(method.(DirectMethod).FormHandler, ShouldNotBeNil)
-						So(*method.(DirectMethod).FormHandler, ShouldBeTrue)
+						So(method.(directMethod).FormHandler, ShouldNotBeNil)
+						So(*method.(directMethod).FormHandler, ShouldBeTrue)
 					});
 					Convey("has no len property", func() {
-						So(method.(DirectMethod).Len, ShouldBeNil)
+						So(method.(directMethod).Len, ShouldBeNil)
 					});
 				})
 			})
 		})
 
 		Convey("Action with methods serialization", func() {
-			jsonText, err := provider.Json()
+			jsonText, err := provider.JSON()
 			So(err, ShouldBeNil)
 			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
 			javaScript, err2 := provider.JavaScript()
@@ -388,8 +388,8 @@ func TestExtDirect(t *testing.T) {
 				h.ServeHTTP(w, r)
 			})
 		})
-		mux.Get(provider.Url, Api(provider))
-		mux.Post(provider.Url, func(c web.C, w http.ResponseWriter, r *http.Request) {
+		mux.Get(provider.URL, API(provider))
+		mux.Post(provider.URL, func(c web.C, w http.ResponseWriter, r *http.Request) {
 			ActionsHandlerCtx(provider)(gcontext.FromC(c), w, r)
 		})
 		mux.Post("/directapi2", ActionsHandler(provider))
@@ -397,7 +397,7 @@ func TestExtDirect(t *testing.T) {
 		defer srv.Close()
 
 		Convey("API info request", func() {
-			res, err := http.Get(srv.URL + provider.Url)
+			res, err := http.Get(srv.URL + provider.URL)
 			Convey("should be processed without error", func() {
 				So(err, ShouldBeNil)
 				Convey("have correct content type", func() {
@@ -413,7 +413,7 @@ func TestExtDirect(t *testing.T) {
 		})
 
 		Convey("API handler request with context", func() {
-			res, err := http.Post(srv.URL + provider.Url, "application/json", strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":33}`))
+			res, err := http.Post(srv.URL + provider.URL, "application/json", strings.NewReader(`{"action":"Db","method":"test","data":null,"type":"rpc","tid":33}`))
 			Convey("should be processed without error", func() {
 				So(err, ShouldBeNil)
 				Convey("have correct content type", func() {
@@ -447,7 +447,7 @@ func TestExtDirect(t *testing.T) {
 		})
 
 		Convey("API handler request to exception method", func() {
-			res, err := http.Post(srv.URL + provider.Url, "application/json", strings.NewReader(`{"action":"Db","method":"testException1","data":null,"type":"rpc","tid":40}`))
+			res, err := http.Post(srv.URL + provider.URL, "application/json", strings.NewReader(`{"action":"Db","method":"testException1","data":null,"type":"rpc","tid":40}`))
 			Convey("should be processed without error", func() {
 				So(err, ShouldBeNil)
 				Convey("have correct content type", func() {

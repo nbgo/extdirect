@@ -98,8 +98,8 @@ func (this Db) UpdateBasicInfo(data map[string]string) (result *extdirect.Direct
 
 func main() {
 	extdirect.Provider.RegisterAction(reflect.TypeOf(Db{}))
-	goji.Get(extdirect.Provider.Url, extdirect.Api(extdirect.Provider))
-	goji.Post(extdirect.Provider.Url, func(c web.C, w http.ResponseWriter, r *http.Request) {
+	goji.Get(extdirect.Provider.URL, extdirect.API(extdirect.Provider))
+	goji.Post(extdirect.Provider.URL, func(c web.C, w http.ResponseWriter, r *http.Request) {
 		extdirect.ActionsHandlerCtx(extdirect.Provider)(context.FromC(c), w, r)
 	})
 	goji.Use(gojistatic.Static("public", gojistatic.StaticOptions{SkipLogging:true}))

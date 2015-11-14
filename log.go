@@ -19,14 +19,18 @@ const (
 
 var log logger = stdlog.New(os.Stderr, "", stdlog.LstdFlags)
 
+// SetLogger sets custom logger for package.
 func SetLogger(l logger) {
 	log = l
 }
 
+// LogrusLogger is a logrus implementation of internal logger.
 type LogrusLogger struct {
 	L *logrus.Entry
 }
-func (this *LogrusLogger) Print(v ...interface{}) {
+
+// Print implements internal logger Print method for logrus.
+func (logrusWrapper *LogrusLogger) Print(v ...interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
 			stdlog.Panicf("Logging error: %v", err)
@@ -35,7 +39,7 @@ func (this *LogrusLogger) Print(v ...interface{}) {
 	if len(v) == 0 {
 		return
 	}
-	l := this.L
+	l := logrusWrapper.L
 	if len(v) == 1 {
 		if err, errOk := v[0].(error); errOk {
 			if err2, err2Ok := fail.GetOriginalError(err).(*ErrDirectActionMethod); err2Ok {

@@ -7,35 +7,42 @@ import (
 	"fmt"
 )
 
+// DirectMethodTags serves to host tags for some direct method.
+// Example: UpdateBasicInfoTags DirectMethodTags `formhandler:"true"`
+// means tag `formhandler:"true"` targets UpdateBasicInfo direct method.
 type DirectMethodTags struct {}
 
-type DirectServiceProviderType string
+type directServiceProviderType string
 const (
-	RemotingProvider DirectServiceProviderType = "remoting"
-	PollingProvider DirectServiceProviderType = "polling"
+	// RemotingProvider is remoting provider type.
+	RemotingProvider directServiceProviderType = "remoting"
+
+	// PollingProvider is polling provider type.
+	PollingProvider directServiceProviderType = "polling"
 )
 
-type DirectServiceProvider struct {
-	Id          *string `json:"id,omitempty"`
-	Type        DirectServiceProviderType `json:"type"`
-	Url         string `json:"url"`
+type directServiceProvider struct {
+	ID          *string `json:"id,omitempty"`
+	Type        directServiceProviderType `json:"type"`
+	URL         string `json:"url"`
 	Namespace   string `json:"namespace"`
 	Timeout     int `json:"timeout"`
-	Actions     map[string]DirectAction `json:"actions"`
+	Actions     map[string]directAction `json:"actions"`
 	actionsInfo map[string]directActionInfo
 	debug       bool
 	profile     bool
 }
 
-type DirectAction []DirectMethod
+type directAction []directMethod
 
-type DirectMethod struct {
+type directMethod struct {
 	Name        string `json:"name"`
 	// Method declaration MUST have one of the following mutually exclusive properties that describe the Method’s calling convention:
 	Len         *int `json:"len,omitempty"`
 	FormHandler *bool `json:"formHander,omitempty"`
 }
 
+// DirectFormHandlerResult is a result of form handler execution.
 type DirectFormHandlerResult struct {
 	Errors  map[string]string `json:"errors,omitempty"`
 	Success bool `json:"success"`
@@ -44,37 +51,42 @@ type DirectFormHandlerResult struct {
 type directActionInfo struct {
 	Type          reflect.Type
 	Methods       map[string]reflect.Method
-	DirectMethods map[string]DirectMethod
+	DirectMethods map[string]directMethod
 }
 
-func (this *DirectServiceProvider) Json() (string, error) {
-	if jsonText, err := json.Marshal(this); err != nil {
+// JSON returns provider as JSON string.
+func (provider directServiceProvider) JSON() (string, error) {
+	if jsonText, err := json.Marshal(provider); err != nil {
 		return "", err
 	} else {
 		return string(jsonText), nil
 	}
 }
 
-func (this *DirectServiceProvider) Debug(debug bool) {
-	this.debug = debug
+// Debug enables/disables debugging for provider.
+func (provider directServiceProvider) Debug(debug bool) {
+	provider.debug = debug
 }
 
-func (this *DirectServiceProvider) Profile(profile bool) {
-	this.profile = profile
+// Profile enables/disables profiling for provider.
+func (provider directServiceProvider) Profile(profile bool) {
+	provider.profile = profile
 }
 
-func (this *DirectServiceProvider) JavaScript() (string, error) {
-	if apiJson, err := this.Json(); err != nil {
+// JavaScript returns javascript declaration of the provider.
+func (provider directServiceProvider) JavaScript() (string, error) {
+	if apiJSON, err := provider.JSON(); err != nil {
 		return "", err
 	} else {
-		return fmt.Sprintf("Ext.ns(\"%s\");%s.REMOTE_API=%s", this.Namespace, this.Namespace, apiJson), nil
+		return fmt.Sprintf("Ext.ns(\"%s\");%s.REMOTE_API=%s", provider.Namespace, provider.Namespace, apiJSON), nil
 	}
 }
 
-func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
+// RegisterAction registers action.
+func (provider directServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	actionTypeName := typeInfo.Name()
-	debug := this.debug
-	if _, ok := this.Actions[actionTypeName]; ok {
+	debug := provider.debug
+	if _, ok := provider.Actions[actionTypeName]; ok {
 		return
 	}
 
@@ -83,9 +95,9 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	}
 
 	methodsLen := typeInfo.NumMethod()
-	directAction := make([]DirectMethod, 0)
+	var directAction []directMethod
 	methods := make(map[string]reflect.Method, 0)
-	directMethods := make(map[string]DirectMethod, 0)
+	directMethods := make(map[string]directMethod, 0)
 
 	if debug {
 		log.Print(fmt.Sprintf("\twith %v methods", methodsLen))
@@ -100,7 +112,7 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 
 		argsLen := methodInfo.Type.NumIn() - 1
 		directMethodName := firstCharToLower(methodInfo.Name)
-		directMethod := DirectMethod{Name: directMethodName}
+		directMethod := directMethod{Name: directMethodName}
 
 		if debug {
 			log.Print(fmt.Sprintf("\t\twith args len = %v", argsLen))
@@ -133,29 +145,32 @@ func (this *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 		directMethods[directMethodName] = directMethod
 	}
 
-	this.Actions[actionTypeName] = directAction
-	this.actionsInfo[actionTypeName] = directActionInfo{
+	provider.Actions[actionTypeName] = directAction
+	provider.actionsInfo[actionTypeName] = directActionInfo{
 		Type: typeInfo,
 		Methods: methods,
 		DirectMethods: directMethods,
 	}
 }
 
-var Provider *DirectServiceProvider
+// Provider is default provider.
+var Provider *directServiceProvider
 
 func init() {
 	Provider = NewProvider()
 }
 
-func NewProvider() (provider *DirectServiceProvider) {
-	provider = &DirectServiceProvider{
+// NewProvider creates new provider with default configuration.
+func NewProvider() (provider *directServiceProvider) {
+	provider = &directServiceProvider{
 		Type: RemotingProvider,
 		Namespace: "DirectApi",
-		Url: "/directapi",
+		URL: "/directapi",
 		Timeout: 30000,
-		Actions: make(map[string]DirectAction),
+		Actions: make(map[string]directAction),
 		actionsInfo: make(map[string]directActionInfo),
 	}
+
 	return
 }
 
