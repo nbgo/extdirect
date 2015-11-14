@@ -19,10 +19,10 @@ type ErrDecodeFromPostRequest struct {
 	Details string
 	Reason  error
 }
-func (this *ErrDecodeFromPostRequest) Error() string {
+func (this ErrDecodeFromPostRequest) Error() string {
 	return fmt.Sprintf("failed to decode form post: %v: %v", this.Details, this.Reason)
 }
-func (this *ErrDecodeFromPostRequest) InnerError() error {
+func (this ErrDecodeFromPostRequest) InnerError() error {
 	return this.Reason
 }
 
@@ -36,7 +36,7 @@ type ErrTypeConversion struct {
 	SourceType reflect.Type
 	TargetType reflect.Type
 }
-func (this *ErrTypeConversion) Error() string {
+func (this ErrTypeConversion) Error() string {
 	return fmt.Sprintf("cannot convert type %v to type %v", this.SourceType, this.TargetType)
 }
 
@@ -46,7 +46,7 @@ type ErrDirectActionMethod struct {
 	Err     interface{}
 	isPanic bool
 }
-func (this *ErrDirectActionMethod) Error() string {
+func (this ErrDirectActionMethod) Error() string {
 	return fmt.Sprintf("error executing %v.%v(): %v", this.Action, this.Method, this.Err)
 }
 
@@ -143,7 +143,7 @@ func (this *DirectServiceProvider) processRequests(c context.Context, r *http.Re
 					profilingStarted = false
 				}
 				if err := recover(); err != nil {
-					log.Print(fail.New(&ErrDirectActionMethod{req.Action, req.Method, err, true}))
+					log.Print(fail.New(ErrDirectActionMethod{req.Action, req.Method, err, true}))
 					resp.Type = "exception"
 					respMessage := fmt.Sprintf("%v", err)
 					resp.Message = &respMessage
@@ -279,7 +279,7 @@ func mustDecodeFormPost(f url.Values) []*request {
 	}
 	tid, tidErr := strconv.Atoi(f["extTID"][0]);
 	if tidErr != nil {
-		panic(fail.New(&ErrDecodeFromPostRequest{"could not parse TID", tidErr}))
+		panic(fail.New(ErrDecodeFromPostRequest{"could not parse TID", tidErr}))
 	}
 	req.Tid = tid
 	upload, hasUpload := f["extUpload"]
@@ -327,7 +327,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(v)
 			case reflect.Int32: return int32(v)
 			case reflect.Float32: return float32(v)
-			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
 			}
 		case nil:
 			switch argType.Kind() {
@@ -336,7 +336,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(0)
 			case reflect.Int32: return int32(0)
 			case reflect.String: return ""
-			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
 			}
 		case map[string]interface{}:
 			switch argType.Kind() {
@@ -346,7 +346,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 				structInstanceRef := structInstanceValue.Addr().Interface()
 				mapstructure.Decode(v, structInstanceRef)
 				return structInstanceValue.Interface()
-			default: panic(fail.New(&ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
 			}
 		}
 	}
