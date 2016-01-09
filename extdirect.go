@@ -64,12 +64,12 @@ func (provider directServiceProvider) JSON() (string, error) {
 }
 
 // Debug enables/disables debugging for provider.
-func (provider directServiceProvider) Debug(debug bool) {
+func (provider *directServiceProvider) Debug(debug bool) {
 	provider.debug = debug
 }
 
 // Profile enables/disables profiling for provider.
-func (provider directServiceProvider) Profile(profile bool) {
+func (provider *directServiceProvider) Profile(profile bool) {
 	provider.profile = profile
 }
 
@@ -83,7 +83,7 @@ func (provider directServiceProvider) JavaScript() (string, error) {
 }
 
 // RegisterAction registers action.
-func (provider directServiceProvider) RegisterAction(typeInfo reflect.Type) {
+func (provider *directServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	actionTypeName := typeInfo.Name()
 	debug := provider.debug
 	if _, ok := provider.Actions[actionTypeName]; ok {
@@ -100,7 +100,7 @@ func (provider directServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	directMethods := make(map[string]directMethod, 0)
 
 	if debug {
-		log.Print(fmt.Sprintf("\twith %v methods", methodsLen))
+		log.Print(fmt.Sprintf("\twith %v method(s)", methodsLen))
 	}
 
 	for i := 0; i < methodsLen; i++ {
