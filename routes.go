@@ -1,4 +1,5 @@
 package extdirect
+
 import (
 	"net/http"
 	"fmt"
@@ -20,7 +21,9 @@ type ErrDecodeFromPostRequest struct {
 	Details string
 	Reason  error
 }
+
 var _ fail.CompositeError = ErrDecodeFromPostRequest{}
+
 func (err ErrDecodeFromPostRequest) Error() string {
 	return fmt.Sprintf("failed to decode form post: %v: %v", err.Details, err.Reason)
 }
@@ -31,6 +34,7 @@ func (err ErrDecodeFromPostRequest) InnerError() error {
 
 // ErrInvalidContentType occurs when client request contains invalid content type.
 type ErrInvalidContentType string
+
 func (err ErrInvalidContentType) Error() string {
 	return fmt.Sprintf("invalid content type: %s", string(err))
 }
@@ -40,6 +44,7 @@ type ErrTypeConversion struct {
 	SourceType reflect.Type
 	TargetType reflect.Type
 }
+
 func (err ErrTypeConversion) Error() string {
 	return fmt.Sprintf("cannot convert type %v to type %v", err.SourceType, err.TargetType)
 }
@@ -51,6 +56,7 @@ type ErrDirectActionMethod struct {
 	Err     interface{}
 	isPanic bool
 }
+
 func (err ErrDirectActionMethod) Error() string {
 	return fmt.Sprintf("error executing %v.%v(): %v", err.Action, err.Method, err.Err)
 }
@@ -230,7 +236,7 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 						}
 						convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
 						if provider.debug {
-							log.Print(fmt.Sprintf("Converted arg #%v type is %T", i, convertedArg))
+							log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, convertedArg == nil))
 						}
 						args[i] = reflect.ValueOf(convertedArg)
 					}
