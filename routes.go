@@ -236,7 +236,11 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 						}
 						convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
 						if provider.debug {
-							log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, convertedArg == nil))
+							isNil := func(v interface{}) bool{
+								defer func() { recover() }()
+								return v == nil || reflect.ValueOf(v).IsNil()
+							}
+							log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, isNil(convertedArg)))
 						}
 						args[i] = reflect.ValueOf(convertedArg)
 					}
