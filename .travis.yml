@@ -21,6 +21,7 @@ install:
   - go get github.com/nbgo/logger
   - go get github.com/goji/context
   - go get github.com/jacobsa/oglematchers
+  - go get github.com/nbgo/jsontime
   
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic
