@@ -12,18 +12,16 @@ before_install:
   - go get golang.org/x/tools/cmd/cover
   
 install:
+  - go get code.google.com/p/go.net/context
+  - go get github.com/nbgo/fail
   - go get github.com/smartystreets/goconvey/convey
-  - go get github.com/mitchellh/mapstructure
   - go get github.com/zenazn/goji
   - go get github.com/ahmetalpbalkan/go-linq
-  - go get github.com/hypebeast/gojistatic
   - go get github.com/Sirupsen/logrus
   - go get github.com/nbgo/logger
   - go get github.com/goji/context
   - go get github.com/jacobsa/oglematchers
-  - go get code.google.com/p/go.net/context
-  - go get github.com/phayes/errors
-
+  
 script:
   - go test -coverprofile=coverage.txt -covermode=atomic
 

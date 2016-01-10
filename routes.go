@@ -38,21 +38,6 @@ func (err ErrInvalidContentType) Error() string {
 	return fmt.Sprintf("invalid content type: %s", string(err))
 }
 
-// ErrTypeConversion contains information about type conversion error.
-type ErrTypeConversion struct {
-	SourceType reflect.Type
-	TargetType reflect.Type
-	Reason     error
-}
-
-func (err ErrTypeConversion) Error() string {
-	reason := ""
-	if err.Reason != nil {
-		reason = fmt.Sprintf(": %v", err.Reason.Error())
-	}
-	return fmt.Sprintf("cannot convert type %v to type %v%v", err.SourceType, err.TargetType, reason)
-}
-
 // ErrDirectActionMethod contains information about error occurred during direct method execution,
 type ErrDirectActionMethod struct {
 	Action  string
