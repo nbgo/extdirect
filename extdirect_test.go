@@ -20,6 +20,7 @@ import (
 	. "github.com/jacobsa/oglematchers"
 	"golang.org/x/net/context"
 	"github.com/nbgo/fail"
+	"github.com/nbgo/jsontime"
 )
 
 var providerDebug = true
@@ -44,11 +45,16 @@ type FilterDescriptor struct {
 	Value    bool
 }
 
+type RequestWithTime struct {
+	Timestamp *jsontime.RFC3339Nano `json:"timestamp"`
+}
+
 type Db struct {
 	C                   context.Context
 	R                   *http.Request
 	UpdateBasicInfoTags DirectMethodTags `formhandler:"true"`
 }
+
 func (this Db) GetRecords(r *GetDataRequest) (string, error) {
 	result := fmt.Sprintf("model=%v page=%v start=%v limit=%v sort=%v", r.Model, r.Page, r.Start, r.Limit, r.Sort)
 	return result, nil
@@ -99,6 +105,9 @@ func (this Db) UpdateBasicInfo(data map[string]string) (result *DirectFormHandle
 	}
 	return
 }
+func (this Db) TestTime(r *RequestWithTime) string {
+	return time.Time(*r.Timestamp).Format(time.RFC3339Nano)
+}
 
 func getResponseByTid(responses []*response, tid int) *response {
 	resp, _, _ := From(responses).FirstBy(func(x T) (bool, error) {
@@ -128,7 +137,7 @@ func TestExtDirect(t *testing.T) {
 			So(len(provider.Actions), ShouldEqual, 1)
 			So(provider.Actions, ShouldContainKey, "Db")
 			Convey("and has 9 methods", func() {
-				So(len(provider.Actions["Db"]), ShouldEqual, 9)
+				So(len(provider.Actions["Db"]), ShouldEqual, 10)
 				Convey("test", func() {
 					method, exists, err := From(provider.Actions["Db"]).FirstBy(func(x T) (bool, error) {
 						if m, ok := x.(directMethod); ok {
@@ -214,10 +223,10 @@ func TestExtDirect(t *testing.T) {
 		Convey("Action with methods serialization", func() {
 			jsonText, err := provider.JSON()
 			So(err, ShouldBeNil)
-			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
+			So(jsonText, ShouldEqual, `{"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"testTime","len":1},{"name":"updateBasicInfo","formHander":true}]}}`)
 			javaScript, err2 := provider.JavaScript()
 			So(err2, ShouldBeNil)
-			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
+			So(javaScript, ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"testTime","len":1},{"name":"updateBasicInfo","formHander":true}]}}`)
 		})
 
 		Convey("Duplicated registration", func() {
@@ -236,7 +245,7 @@ func TestExtDirect(t *testing.T) {
 			So(len(reqs), ShouldEqual, 1)
 			So(reqs[0].Action, ShouldEqual, "Db")
 			So(reqs[0].Method, ShouldEqual, "test")
-			So(reqs[0].Data, ShouldBeNil)
+			So(string(reqs[0].Data), ShouldEqual, "null")
 			So(reqs[0].Tid, ShouldEqual, 1)
 			So(reqs[0].Type, ShouldEqual, "rpc")
 			Convey("which is processed into 1 response with correct fields", func() {
@@ -268,20 +277,16 @@ func TestExtDirect(t *testing.T) {
 			So(len(reqs), ShouldEqual, 2)
 			So(reqs[0].Action, ShouldEqual, "Db")
 			So(reqs[0].Method, ShouldEqual, "testEcho1")
-			dataArray, dataArrayOk := reqs[0].Data.([]interface{})
-			So(dataArrayOk, ShouldBeTrue)
-			So(len(dataArray), ShouldEqual, 1)
-			So(dataArray[0], ShouldEqual, "Hello!")
+			So(string(reqs[0].Data), ShouldEqual, `["Hello!"]`)
 			So(reqs[0].Tid, ShouldEqual, 1)
 			So(reqs[0].Type, ShouldEqual, "rpc")
 
 			So(reqs[1].Action, ShouldEqual, "Db")
 			So(reqs[1].Method, ShouldEqual, "testEcho2")
-			dataArray, dataArrayOk = reqs[1].Data.([]interface{})
-			So(dataArrayOk, ShouldBeTrue)
-			So(len(dataArray), ShouldEqual, 7)
+			So(string(reqs[1].Data), ShouldEqual, `["Hello", 1, 2, 3, 4, null, null]`)
 			So(reqs[1].Tid, ShouldEqual, 2)
 			So(reqs[1].Type, ShouldEqual, "rpc")
+
 			Convey("which is concurrently processed into 2 responses with correct fields", func() {
 				t1 := time.Now()
 				resps := provider.processRequests(nil, nil, reqs)
@@ -356,6 +361,24 @@ func TestExtDirect(t *testing.T) {
 		})
 	})
 
+	Convey("Request with time", t, func() {
+		provider := NewProvider()
+		provider.Debug(providerDebug)
+		provider.Profile(providerProfile)
+		provider.RegisterAction(reflect.TypeOf(Db{}))
+		reqs := mustDecodeTransaction(strings.NewReader(`{"action":"Db","method":"testTime","data":[{"timestamp":"2009-11-10T23:00:00Z"}],"type":"rpc","tid":1}`))
+		Convey("processed with correct result", func() {
+			resps := provider.processRequests(nil, nil, reqs)
+			So(len(resps), ShouldEqual, 1)
+			if resps[0].Message != nil {
+				So(*resps[0].Message, ShouldBeEmpty)
+			}
+			So(resps[0].Message, ShouldBeNil)
+			So(resps[0].Type, ShouldEqual, "rpc")
+			So(resps[0].Result, ShouldEqual, `2009-11-10T23:00:00Z`)
+		})
+	})
+
 	Convey("Context setting", t, func() {
 		provider := NewProvider()
 		provider.Debug(providerDebug)
@@ -406,7 +429,7 @@ func TestExtDirect(t *testing.T) {
 						body, err := ioutil.ReadAll(res.Body)
 						res.Body.Close()
 						So(err, ShouldBeNil)
-						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"updateBasicInfo","formHander":true}]}}`)
+						So(string(body), ShouldEqual, `Ext.ns("DirectApi");DirectApi.REMOTE_API={"type":"remoting","url":"/directapi","namespace":"DirectApi","timeout":30000,"actions":{"Db":[{"name":"getRecords","len":1},{"name":"test","len":0},{"name":"testEcho1","len":1},{"name":"testEcho2","len":7},{"name":"testException1","len":0},{"name":"testException2","len":0},{"name":"testException3","len":0},{"name":"testException4","len":0},{"name":"testTime","len":1},{"name":"updateBasicInfo","formHander":true}]}}`)
 					})
 				})
 			})

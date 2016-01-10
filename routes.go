@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"encoding/json"
 	"reflect"
-	"github.com/mitchellh/mapstructure"
 	"time"
 	"golang.org/x/net/context"
 	"net/url"
@@ -67,20 +66,21 @@ func (err ErrDirectActionMethod) Error() string {
 }
 
 type request struct {
-	Type   string `json:"type"`
-	Tid    int `json:"tid"`
-	Action string `json:"action"`
-	Method string `json:"method"`
-	Upload bool `json:"upload"`
-	Data   interface{} `json:"data"`
+	Type     string            `json:"type"`
+	Tid      int               `json:"tid"`
+	Action   string            `json:"action"`
+	Method   string            `json:"method"`
+	Upload   bool              `json:"upload"`
+	Data     json.RawMessage   `json:"data"`
+	FormData map[string]string `json:"-"`
 }
 
 type response struct {
-	Type    string `json:"type"`
-	Tid     int `json:"tid"`
-	Action  string `json:"action"`
-	Method  string `json:"method"`
-	Message *string `json:"message,omitempty"`
+	Type    string      `json:"type"`
+	Tid     int         `json:"tid"`
+	Action  string      `json:"action"`
+	Method  string      `json:"method"`
+	Message *string     `json:"message,omitempty"`
 	Result  interface{} `json:"result,omitempty"`
 }
 
@@ -135,7 +135,6 @@ func actionHandler(provider *directServiceProvider, c context.Context, w http.Re
 	} else {
 		resps := provider.processRequests(c, r, reqs)
 		err = json.NewEncoder(w).Encode(resps[0])
-
 	}
 	if err != nil {
 		panic(err)
@@ -217,39 +216,54 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 			}
 			methodInfo := actionInfo.Methods[req.Method]
 			directMethod := actionInfo.DirectMethods[req.Method]
+			isFormHandler := false
+			if directMethod.FormHandler != nil {
+				isFormHandler = *directMethod.FormHandler
+			}
 			if provider.debug {
-				log.Print(fmt.Sprintf("Direct method to use: %s, formhandler=%v", directMethod.Name, directMethod.FormHandler))
+				log.Print(fmt.Sprintf("Direct method to use: %s, formhandler=%v", directMethod.Name, isFormHandler))
 			}
 			methodArgsLen := methodInfo.Type.NumIn() - 1
 			var args []reflect.Value
-			if req.Data != nil {
-				if provider.debug {
-					log.Print(fmt.Sprintf("Type of request data is %T", req.Data))
-				}
-				if directMethod.FormHandler != nil {
+			if (req.Data != nil && !isFormHandler) || (req.FormData != nil && isFormHandler) {
+				if isFormHandler {
 					if provider.debug {
 						log.Print("Prepare arguments for form handler call.")
 					}
 					args = make([]reflect.Value, 1)
-					args[0] = reflect.ValueOf(req.Data.(map[string]string))
+					args[0] = reflect.ValueOf(req.FormData)
 					// TODO: Support structure type argument for form handler.
 				} else {
 					args = make([]reflect.Value, methodArgsLen)
-					for i, arg := range req.Data.([]interface{}) {
+					var argsArray []json.RawMessage
+					if err := json.Unmarshal(req.Data, &argsArray); err != nil {
+						panic(fail.NewErrWithReason("could not parse request data", err))
+					}
+					for i, arg := range argsArray {
+						//if provider.debug {
+						//	log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
+						//}
+
+						methodArgType := methodInfo.Type.In(i + 1)
 						if provider.debug {
-							log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
+							log.Print(fmt.Sprintf("Parse `%v` into %v", string(arg), methodArgType))
 						}
-						convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
-						if provider.debug {
-							isNil := func(v interface{}) bool {
-								defer func() {
-									recover()
-								}()
-								return v == nil || reflect.ValueOf(v).IsNil()
-							}
-							log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, isNil(convertedArg)))
-						}
-						args[i] = reflect.ValueOf(convertedArg)
+						argValue := reflect.New(methodArgType).Elem()
+						argRef := argValue.Addr().Interface()
+						json.Unmarshal(arg, argRef)
+						args[i] = reflect.ValueOf(argValue.Interface())
+
+						//convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
+						//if provider.debug {
+						//	isNil := func(v interface{}) bool {
+						//		defer func() {
+						//			recover()
+						//		}()
+						//		return v == nil || reflect.ValueOf(v).IsNil()
+						//	}
+						//	log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, isNil(convertedArg)))
+						//}
+						//args[i] = reflect.ValueOf(convertedArg)
 					}
 				}
 			}
@@ -298,7 +312,7 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 
 func mustDecodeFormPost(f url.Values) []*request {
 	req := &request{
-		Type:f["extType"][0],
+		Type:   f["extType"][0],
 		Action: f["extAction"][0],
 		Method: f["extMethod"][0],
 	}
@@ -317,7 +331,7 @@ func mustDecodeFormPost(f url.Values) []*request {
 		}
 		data[k] = v[0]
 	}
-	req.Data = data
+	req.FormData = data
 
 	return []*request{req}
 }
@@ -341,42 +355,42 @@ func mustDecodeTransaction(r io.Reader) []*request {
 	}
 }
 
-func convertArg(argType reflect.Type, argValue interface{}) interface{} {
-	sourceType := reflect.TypeOf(argValue)
-	if sourceType != argType {
-		switch v := argValue.(type) {
-		case float64:
-			switch argType.Kind() {
-			case reflect.Int: return int(v)
-			case reflect.Int8: return int8(v)
-			case reflect.Int16: return int16(v)
-			case reflect.Int32: return int32(v)
-			case reflect.Float32: return float32(v)
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-			}
-		case nil:
-			switch argType.Kind() {
-			case reflect.Int: return int(0)
-			case reflect.Int8: return int8(0)
-			case reflect.Int16: return int16(0)
-			case reflect.Int32: return int32(0)
-			case reflect.String: return ""
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-			}
-		case map[string]interface{}:
-			switch argType.Kind() {
-			case reflect.Ptr: fallthrough
-			case reflect.Struct:
-				structInstanceValue := reflect.New(argType).Elem()
-				structInstanceRef := structInstanceValue.Addr().Interface()
-				if err := mapstructure.Decode(v, structInstanceRef); err != nil {
-					panic(fail.New(ErrTypeConversion{sourceType, argType, err}))
-				}
-				return structInstanceValue.Interface()
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-			}
-		}
-	}
-
-	return argValue
-}
+//func convertArg(argType reflect.Type, argValue interface{}) interface{} {
+//	sourceType := reflect.TypeOf(argValue)
+//	if sourceType != argType {
+//		switch v := argValue.(type) {
+//		case float64:
+//			switch argType.Kind() {
+//			case reflect.Int: return int(v)
+//			case reflect.Int8: return int8(v)
+//			case reflect.Int16: return int16(v)
+//			case reflect.Int32: return int32(v)
+//			case reflect.Float32: return float32(v)
+//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
+//			}
+//		case nil:
+//			switch argType.Kind() {
+//			case reflect.Int: return int(0)
+//			case reflect.Int8: return int8(0)
+//			case reflect.Int16: return int16(0)
+//			case reflect.Int32: return int32(0)
+//			case reflect.String: return ""
+//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
+//			}
+//		case map[string]interface{}:
+//			switch argType.Kind() {
+//			case reflect.Ptr: fallthrough
+//			case reflect.Struct:
+//				structInstanceValue := reflect.New(argType).Elem()
+//				structInstanceRef := structInstanceValue.Addr().Interface()
+//				if err := mapstructure.Decode(v, structInstanceRef); err != nil {
+//					panic(fail.New(ErrTypeConversion{sourceType, argType, err}))
+//				}
+//				return structInstanceValue.Interface()
+//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
+//			}
+//		}
+//	}
+//
+//	return argValue
+//}
