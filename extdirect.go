@@ -1,4 +1,5 @@
 package extdirect
+
 import (
 	"reflect"
 	"encoding/json"
@@ -10,18 +11,20 @@ import (
 // DirectMethodTags serves to host tags for some direct method.
 // Example: UpdateBasicInfoTags DirectMethodTags `formhandler:"true"`
 // means tag `formhandler:"true"` targets UpdateBasicInfo direct method.
-type DirectMethodTags struct {}
+type DirectMethodTags struct{}
 
 type directServiceProviderType string
+
 const (
-	// RemotingProvider is remoting provider type.
+// RemotingProvider is remoting provider type.
 	RemotingProvider directServiceProviderType = "remoting"
 
-	// PollingProvider is polling provider type.
+// PollingProvider is polling provider type.
 	PollingProvider directServiceProviderType = "polling"
 )
 
-type directServiceProvider struct {
+// DirectServiceProvider represents Ext Direct service settings.
+type DirectServiceProvider struct {
 	ID          *string `json:"id,omitempty"`
 	Type        directServiceProviderType `json:"type"`
 	URL         string `json:"url"`
@@ -55,35 +58,35 @@ type directActionInfo struct {
 }
 
 // JSON returns provider as JSON string.
-func (provider directServiceProvider) JSON() (string, error) {
-	if jsonText, err := json.Marshal(provider); err != nil {
+func (provider DirectServiceProvider) JSON() (string, error) {
+	jsonText, err := json.Marshal(provider);
+	if err != nil {
 		return "", err
-	} else {
-		return string(jsonText), nil
 	}
+	return string(jsonText), nil
 }
 
 // Debug enables/disables debugging for provider.
-func (provider *directServiceProvider) Debug(debug bool) {
+func (provider *DirectServiceProvider) Debug(debug bool) {
 	provider.debug = debug
 }
 
 // Profile enables/disables profiling for provider.
-func (provider *directServiceProvider) Profile(profile bool) {
+func (provider *DirectServiceProvider) Profile(profile bool) {
 	provider.profile = profile
 }
 
 // JavaScript returns javascript declaration of the provider.
-func (provider directServiceProvider) JavaScript() (string, error) {
-	if apiJSON, err := provider.JSON(); err != nil {
+func (provider DirectServiceProvider) JavaScript() (string, error) {
+	apiJSON, err := provider.JSON();
+	if err != nil {
 		return "", err
-	} else {
-		return fmt.Sprintf("Ext.ns(\"%s\");%s.REMOTE_API=%s", provider.Namespace, provider.Namespace, apiJSON), nil
 	}
+	return fmt.Sprintf("Ext.ns(\"%s\");%s.REMOTE_API=%s", provider.Namespace, provider.Namespace, apiJSON), nil
 }
 
 // RegisterAction registers action.
-func (provider *directServiceProvider) RegisterAction(typeInfo reflect.Type) {
+func (provider *DirectServiceProvider) RegisterAction(typeInfo reflect.Type) {
 	actionTypeName := typeInfo.Name()
 	debug := provider.debug
 	if _, ok := provider.Actions[actionTypeName]; ok {
@@ -154,15 +157,15 @@ func (provider *directServiceProvider) RegisterAction(typeInfo reflect.Type) {
 }
 
 // Provider is default provider.
-var Provider *directServiceProvider
+var Provider *DirectServiceProvider
 
 func init() {
 	Provider = NewProvider()
 }
 
 // NewProvider creates new provider with default configuration.
-func NewProvider() (provider *directServiceProvider) {
-	provider = &directServiceProvider{
+func NewProvider() (provider *DirectServiceProvider) {
+	provider = &DirectServiceProvider{
 		Type: RemotingProvider,
 		Namespace: "DirectApi",
 		URL: "/directapi",

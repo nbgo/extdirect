@@ -85,7 +85,7 @@ type response struct {
 }
 
 // API is routes for getting Ext.Direct API script.
-func API(provider *directServiceProvider) func(w http.ResponseWriter, r *http.Request) {
+func API(provider *DirectServiceProvider) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 		if js, err := provider.JavaScript(); err != nil {
@@ -99,20 +99,20 @@ func API(provider *directServiceProvider) func(w http.ResponseWriter, r *http.Re
 }
 
 // ActionsHandler is route for handling Ext.Direct requests.
-func ActionsHandler(provider *directServiceProvider) func(w http.ResponseWriter, r *http.Request) {
+func ActionsHandler(provider *DirectServiceProvider) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		actionHandler(provider, nil, w, r)
 	}
 }
 
 // ActionsHandlerCtx is route with context suppor for handling Ext.Direct requests.
-func ActionsHandlerCtx(provider *directServiceProvider) func(c context.Context, w http.ResponseWriter, r *http.Request) {
+func ActionsHandlerCtx(provider *DirectServiceProvider) func(c context.Context, w http.ResponseWriter, r *http.Request) {
 	return func(c context.Context, w http.ResponseWriter, r *http.Request) {
 		actionHandler(provider, c, w, r)
 	}
 }
 
-func actionHandler(provider *directServiceProvider, c context.Context, w http.ResponseWriter, r *http.Request) {
+func actionHandler(provider *DirectServiceProvider, c context.Context, w http.ResponseWriter, r *http.Request) {
 	var reqs []*request
 	var err error
 	contentType := r.Header.Get("Content-Type")
@@ -141,7 +141,7 @@ func actionHandler(provider *directServiceProvider, c context.Context, w http.Re
 	}
 }
 
-func (provider *directServiceProvider) processRequests(c context.Context, r *http.Request, reqs []*request) []*response {
+func (provider *DirectServiceProvider) processRequests(c context.Context, r *http.Request, reqs []*request) []*response {
 	resps := make([]*response, len(reqs))
 	respsChannel := make(chan *response, len(reqs))
 	for _, req := range reqs {
@@ -154,12 +154,17 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 			}
 			var tStart time.Time
 			profilingStarted := false
-			defer func() {
+
+			logProfiling := func() {
 				if profilingStarted {
 					duration := time.Now().Sub(tStart)
 					log.Print(logLevelInfo, fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
 					profilingStarted = false
 				}
+			}
+
+			defer func() {
+				logProfiling()
 				if err := recover(); err != nil {
 					log.Print(fail.New(ErrDirectActionMethod{req.Action, req.Method, err, true}))
 					resp.Type = "exception"
@@ -240,10 +245,6 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 						panic(fail.NewErrWithReason("could not parse request data", err))
 					}
 					for i, arg := range argsArray {
-						//if provider.debug {
-						//	log.Print(fmt.Sprintf("Initial arg #%v type is %T", i, arg))
-						//}
-
 						methodArgType := methodInfo.Type.In(i + 1)
 						if provider.debug {
 							log.Print(fmt.Sprintf("Parse `%v` into %v", string(arg), methodArgType))
@@ -252,18 +253,6 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 						argRef := argValue.Addr().Interface()
 						json.Unmarshal(arg, argRef)
 						args[i] = reflect.ValueOf(argValue.Interface())
-
-						//convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
-						//if provider.debug {
-						//	isNil := func(v interface{}) bool {
-						//		defer func() {
-						//			recover()
-						//		}()
-						//		return v == nil || reflect.ValueOf(v).IsNil()
-						//	}
-						//	log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, isNil(convertedArg)))
-						//}
-						//args[i] = reflect.ValueOf(convertedArg)
 					}
 				}
 			}
@@ -279,11 +268,7 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 			// Call action method.
 			resultsValues := actionVal.MethodByName(methodInfo.Name).Call(args)
 
-			if profilingStarted {
-				duration := time.Now().Sub(tStart)
-				log.Print(logLevelInfo, fmt.Sprintf("%s.%s() %v ", req.Action, req.Method, duration), map[string]interface{}{"duration":duration, "action": req.Action, "method": req.Method})
-				profilingStarted = false
-			}
+			logProfiling()
 			for i, resultValue := range resultsValues {
 				if methodInfo.Type.Out(i).Name() == "error" {
 					if err, isErr := resultValue.Interface().(error); isErr {
@@ -354,43 +339,3 @@ func mustDecodeTransaction(r io.Reader) []*request {
 		return reqs
 	}
 }
-
-//func convertArg(argType reflect.Type, argValue interface{}) interface{} {
-//	sourceType := reflect.TypeOf(argValue)
-//	if sourceType != argType {
-//		switch v := argValue.(type) {
-//		case float64:
-//			switch argType.Kind() {
-//			case reflect.Int: return int(v)
-//			case reflect.Int8: return int8(v)
-//			case reflect.Int16: return int16(v)
-//			case reflect.Int32: return int32(v)
-//			case reflect.Float32: return float32(v)
-//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-//			}
-//		case nil:
-//			switch argType.Kind() {
-//			case reflect.Int: return int(0)
-//			case reflect.Int8: return int8(0)
-//			case reflect.Int16: return int16(0)
-//			case reflect.Int32: return int32(0)
-//			case reflect.String: return ""
-//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-//			}
-//		case map[string]interface{}:
-//			switch argType.Kind() {
-//			case reflect.Ptr: fallthrough
-//			case reflect.Struct:
-//				structInstanceValue := reflect.New(argType).Elem()
-//				structInstanceRef := structInstanceValue.Addr().Interface()
-//				if err := mapstructure.Decode(v, structInstanceRef); err != nil {
-//					panic(fail.New(ErrTypeConversion{sourceType, argType, err}))
-//				}
-//				return structInstanceValue.Interface()
-//			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
-//			}
-//		}
-//	}
-//
-//	return argValue
-//}
