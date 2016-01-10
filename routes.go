@@ -43,10 +43,15 @@ func (err ErrInvalidContentType) Error() string {
 type ErrTypeConversion struct {
 	SourceType reflect.Type
 	TargetType reflect.Type
+	Reason     error
 }
 
 func (err ErrTypeConversion) Error() string {
-	return fmt.Sprintf("cannot convert type %v to type %v", err.SourceType, err.TargetType)
+	reason := ""
+	if err.Reason != nil {
+		reason = fmt.Sprintf(": %v", err.Reason.Error())
+	}
+	return fmt.Sprintf("cannot convert type %v to type %v%v", err.SourceType, err.TargetType, reason)
 }
 
 // ErrDirectActionMethod contains information about error occurred during direct method execution,
@@ -236,8 +241,10 @@ func (provider *directServiceProvider) processRequests(c context.Context, r *htt
 						}
 						convertedArg := convertArg(methodInfo.Type.In(i + 1), arg)
 						if provider.debug {
-							isNil := func(v interface{}) bool{
-								defer func() { recover() }()
+							isNil := func(v interface{}) bool {
+								defer func() {
+									recover()
+								}()
 								return v == nil || reflect.ValueOf(v).IsNil()
 							}
 							log.Print(fmt.Sprintf("Converted arg #%v type is %T, IsNil=%v", i, convertedArg, isNil(convertedArg)))
@@ -345,7 +352,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(v)
 			case reflect.Int32: return int32(v)
 			case reflect.Float32: return float32(v)
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
 			}
 		case nil:
 			switch argType.Kind() {
@@ -354,7 +361,7 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Int16: return int16(0)
 			case reflect.Int32: return int32(0)
 			case reflect.String: return ""
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
 			}
 		case map[string]interface{}:
 			switch argType.Kind() {
@@ -362,9 +369,11 @@ func convertArg(argType reflect.Type, argValue interface{}) interface{} {
 			case reflect.Struct:
 				structInstanceValue := reflect.New(argType).Elem()
 				structInstanceRef := structInstanceValue.Addr().Interface()
-				mapstructure.Decode(v, structInstanceRef)
+				if err := mapstructure.Decode(v, structInstanceRef); err != nil {
+					panic(fail.New(ErrTypeConversion{sourceType, argType, err}))
+				}
 				return structInstanceValue.Interface()
-			default: panic(fail.New(ErrTypeConversion{sourceType, argType}))
+			default: panic(fail.New(ErrTypeConversion{sourceType, argType, nil}))
 			}
 		}
 	}
