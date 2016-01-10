@@ -10,7 +10,8 @@ import (
 	"fmt"
 	"time"
 	"errors"
-	"github.com/goji/context"
+	gcontext "github.com/goji/context"
+	"golang.org/x/net/context"
 )
 
 type GetDataRequest struct {
@@ -43,9 +44,10 @@ type User struct {
 }
 
 type Db struct {
-	Ctx *web.C
+	Ctx context.Context
 	Req *http.Request
 }
+
 func (this Db) GetRecords(r *GetDataRequest) (*GetDataResponse, error) {
 	fmt.Printf("Hello from GetRecords(): model=%v start=%v limit=%v\n", r.Model, r.Start, r.Limit)
 	result := &GetDataResponse{
@@ -100,7 +102,7 @@ func main() {
 	extdirect.Provider.RegisterAction(reflect.TypeOf(Db{}))
 	goji.Get(extdirect.Provider.URL, extdirect.API(extdirect.Provider))
 	goji.Post(extdirect.Provider.URL, func(c web.C, w http.ResponseWriter, r *http.Request) {
-		extdirect.ActionsHandlerCtx(extdirect.Provider)(context.FromC(c), w, r)
+		extdirect.ActionsHandlerCtx(extdirect.Provider)(gcontext.FromC(c), w, r)
 	})
 	goji.Use(gojistatic.Static("public", gojistatic.StaticOptions{SkipLogging:true}))
 	goji.Serve()
