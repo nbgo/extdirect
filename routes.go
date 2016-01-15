@@ -236,7 +236,9 @@ func (provider *DirectServiceProvider) processRequests(c context.Context, r *htt
 						}
 						argValue := reflect.New(methodArgType).Elem()
 						argRef := argValue.Addr().Interface()
-						json.Unmarshal(arg, argRef)
+						if err := json.Unmarshal(arg, argRef); err != nil {
+							panic(fail.NewErrWithReason("could not parse request data", err))
+						}
 						args[i] = reflect.ValueOf(argValue.Interface())
 					}
 				}
